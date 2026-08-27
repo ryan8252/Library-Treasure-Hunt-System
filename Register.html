@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+
+<html lang="zh-Hant">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0"
+>
+
+<title>小隊註冊</title>
+
+
+<style>
+
+body {
+
+  margin: 0;
+
+  font-family:
+    Arial,
+    "Microsoft JhengHei",
+    sans-serif;
+
+  background: #f4f6f8;
+
+}
+
+
+.header {
+
+  background: #163447;
+
+  color: white;
+
+  padding: 22px 40px;
+
+  font-size: 28px;
+
+  font-weight: bold;
+
+}
+
+
+.container {
+
+  width: 700px;
+
+  max-width:
+    calc(100% - 40px);
+
+  margin: 45px auto;
+
+  background: white;
+
+  padding: 40px;
+
+  border-radius: 12px;
+
+  box-shadow:
+    0 3px 12px
+    rgba(0,0,0,0.12);
+
+}
+
+
+h2 {
+
+  margin-top: 0;
+
+  margin-bottom: 35px;
+
+}
+
+
+.field {
+
+  margin: 25px 0;
+
+}
+
+
+label {
+
+  display: block;
+
+  font-size: 20px;
+
+  font-weight: bold;
+
+  margin-bottom: 10px;
+
+}
+
+
+.step {
+
+  color: #1689bd;
+
+  margin-right: 8px;
+
+}
+
+
+input {
+
+  box-sizing: border-box;
+
+  width: 100%;
+
+  padding: 15px;
+
+  font-size: 22px;
+
+  border:
+    2px solid #bbb;
+
+  border-radius: 7px;
+
+}
+
+
+input:focus {
+
+  border-color: #1689bd;
+
+  outline: none;
+
+}
+
+
+button {
+
+  width: 100%;
+
+  margin-top: 20px;
+
+  padding: 15px;
+
+  border: 0;
+
+  border-radius: 7px;
+
+  background: #168340;
+
+  color: white;
+
+  font-size: 21px;
+
+  font-weight: bold;
+
+  cursor: pointer;
+
+}
+
+
+button:disabled {
+
+  opacity: 0.5;
+
+  cursor: default;
+
+}
+
+
+#result {
+
+  margin-top: 25px;
+
+  padding: 20px;
+
+  background: #f0f3f5;
+
+  border-radius: 8px;
+
+  font-size: 19px;
+
+  line-height: 1.8;
+
+}
+
+
+.success {
+
+  color: #168340;
+
+  font-size: 25px;
+
+  font-weight: bold;
+
+}
+
+
+.error {
+
+  color: #c5221f;
+
+  font-size: 20px;
+
+  font-weight: bold;
+
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<div class="header">
+
+  圖書館尋寶活動
+
+</div>
+
+
+<div class="container">
+
+
+  <h2>小隊註冊</h2>
+
+  <div
+    id="classDisplay"
+    style="
+      font-size:26px;
+      font-weight:bold;
+      margin-bottom:30px;
+      color:#1689bd;
+    "
+  >
+    正在讀取班級……
+  </div>
+
+
+
+  <!-- 1 -->
+
+  <div class="field">
+
+    <label for="libraryCard">
+
+      <span class="step">
+        ①
+      </span>
+
+      掃描借書證
+
+    </label>
+
+
+    <input
+      id="libraryCard"
+      type="text"
+      placeholder="請掃描其中一位隊員的借書證"
+      autocomplete="off"
+      autocapitalize="off"
+      spellcheck="false"
+      inputmode="latin"
+    >
+
+  </div>
+
+
+
+  <!-- 2 -->
+
+  <div class="field">
+
+    <label for="teamName">
+
+      <span class="step">
+        ②
+      </span>
+
+      小隊名稱（5個字以內）
+
+    </label>
+
+
+    <input
+      id="teamName"
+      type="text"
+      placeholder="例如：皮卡丘隊"
+      autocomplete="off"
+      maxlength="5"
+    >
+
+  </div>
+
+
+
+  <!-- 3 -->
+
+  <div class="field">
+
+    <label for="member1">
+
+      <span class="step">
+        ③
+      </span>
+
+      隊員一學號
+
+    </label>
+
+
+    <input
+      id="member1"
+      type="text"
+      placeholder="例如：60501"
+      autocomplete="off"
+      inputmode="numeric"
+      maxlength="5"
+    >
+
+  </div>
+
+
+
+  <!-- 4 -->
+
+  <div class="field">
+
+    <label for="member2">
+
+      <span class="step">
+        ④
+      </span>
+
+      隊員二學號
+
+    </label>
+
+
+    <input
+      id="member2"
+      type="text"
+      placeholder="例如：60502"
+      autocomplete="off"
+      inputmode="numeric"
+      maxlength="5"
+    >
+
+  </div>
+
+
+
+  <button
+    id="registerButton"
+    onclick="submitRegistration()"
+  >
+
+    完成註冊
+
+  </button>
+
+
+
+  <div id="result">
+
+    請先掃描借書證。
+
+  </div>
+
+
+</div>
+
+
+
+<script>
+
+
+const libraryCard =
+  document.getElementById(
+    "libraryCard"
+  );
+
+
+const teamName =
+  document.getElementById(
+    "teamName"
+  );
+
+
+const member1 =
+  document.getElementById(
+    "member1"
+  );
+
+
+const member2 =
+  document.getElementById(
+    "member2"
+  );
+
+
+const result =
+  document.getElementById(
+    "result"
+  );
+
+
+const registerButton =
+  document.getElementById(
+    "registerButton"
+  );
+
+
+
+let saving = false;
+
+let currentClassId = "";
+
+
+
+window.onload =
+  function() {
+
+    google.script.url.getLocation(
+
+      function(location) {
+
+        const classId =
+          location.parameter.class
+            ? String(
+                location.parameter.class
+              ).trim()
+            : "";
+
+
+        google.script.run
+
+          .withSuccessHandler(
+
+            function(info) {
+
+              if (!info.valid) {
+
+                result.innerHTML =
+
+                  '<div class="error">' +
+
+                  '✗ 班級網址不正確' +
+
+                  '</div>';
+
+                return;
+
+              }
+
+
+              currentClassId =
+                info.classId;
+
+
+              document
+                .getElementById(
+                  "classDisplay"
+                )
+                .textContent =
+                info.className;
+
+
+              libraryCard.focus();
+
+            }
+
+          )
+
+          .getClassInfo(
+            classId
+          );
+
+      }
+
+    );
+
+  };
+
+
+
+// ==========================================
+// 借書證掃完，自動跳小隊名稱
+// ==========================================
+
+libraryCard.addEventListener(
+  "keydown",
+  function(event) {
+
+    if (event.key === "Enter") {
+
+      event.preventDefault();
+
+
+      libraryCard.value =
+        libraryCard.value
+          .trim()
+          .toUpperCase();
+
+
+      if (
+        !/^[A-Z][12][0-9]{8}$/
+          .test(libraryCard.value)
+      ) {
+
+        result.innerHTML =
+
+          '<div class="error">' +
+
+          '✗ 借書證格式不正確' +
+
+          '</div>';
+
+
+        libraryCard.select();
+
+        return;
+
+      }
+
+
+      result.innerHTML =
+
+        "✓ 已讀取借書證，請輸入小隊名稱。";
+
+
+      teamName.focus();
+
+    }
+
+  }
+);
+
+
+
+// ==========================================
+// 小隊名稱 Enter → 隊員一
+// ==========================================
+
+teamName.addEventListener(
+  "keydown",
+  function(event) {
+
+    if (
+      event.key === "Enter"
+      &&
+      teamName.value.trim()
+    ) {
+
+      event.preventDefault();
+
+      member1.focus();
+
+    }
+
+  }
+);
+
+
+
+// ==========================================
+// 隊員一 Enter → 隊員二
+// ==========================================
+
+member1.addEventListener(
+  "keydown",
+  function(event) {
+
+    if (event.key === "Enter") {
+
+      event.preventDefault();
+
+      member2.focus();
+
+    }
+
+  }
+);
+
+
+
+// ==========================================
+// 隊員二 Enter → 直接註冊
+// ==========================================
+
+member2.addEventListener(
+  "keydown",
+  function(event) {
+
+    if (event.key === "Enter") {
+
+      event.preventDefault();
+
+      submitRegistration();
+
+    }
+
+  }
+);
+
+
+
+// ==========================================
+// 註冊
+// ==========================================
+
+function submitRegistration() {
+
+
+  if (saving) {
+
+    return;
+
+  }
+
+
+  const card =
+    libraryCard.value
+      .trim()
+      .toUpperCase();
+
+
+  const name =
+    teamName.value
+      .trim();
+
+
+  const id1 =
+    member1.value
+      .trim();
+
+
+  const id2 =
+    member2.value
+      .trim();
+
+
+
+  if (!card) {
+
+    showError(
+      "請先掃描借書證"
+    );
+
+    libraryCard.focus();
+
+    return;
+
+  }
+
+
+  if (!name) {
+
+    showError(
+      "請輸入小隊名稱"
+    );
+
+    teamName.focus();
+
+    return;
+
+  }
+
+
+  if (!id1) {
+
+    showError(
+      "請輸入隊員一學號"
+    );
+
+    member1.focus();
+
+    return;
+
+  }
+
+
+  if (!id2) {
+
+    showError(
+      "請輸入隊員二學號"
+    );
+
+    member2.focus();
+
+    return;
+
+  }
+
+
+
+  saving = true;
+
+
+  registerButton.disabled =
+    true;
+
+
+  result.innerHTML =
+
+    "註冊中……";
+
+
+
+  google.script.run
+
+
+  .withSuccessHandler(
+
+    function(data) {
+
+      saving = false;
+
+      registerButton.disabled =
+        true;
+
+
+      result.innerHTML =
+
+        '<div class="success">' +
+
+        '✓ 小隊註冊完成！' +
+
+        '</div>' +
+
+        '<br>' +
+
+        '小隊名稱：<b>' +
+
+        escapeHtml(
+          data.teamName
+        ) +
+
+        '</b><br>' +
+
+        '隊員：<b>' +
+
+        escapeHtml(
+          data.member1Id
+        ) +
+
+        '、' +
+
+        escapeHtml(
+          data.member2Id
+        ) +
+
+        '</b><br><br>' +
+
+        '正在進入尋寶活動……';
+
+
+      // ========================================
+      // 取得網站網址後
+      // 自動跳到 Index
+      // ========================================
+
+      google.script.run
+
+        .withSuccessHandler(
+
+          function(url) {
+
+            const targetUrl =
+              url +
+              '?class=' +
+              encodeURIComponent(
+                currentClassId
+              ) +
+              '&registered=' +
+              encodeURIComponent(
+                data.libraryCard
+              );
+
+            window.open(
+              targetUrl,
+              '_top'
+            );
+
+          }
+
+        )
+
+        .getWebAppUrl();
+
+    }
+
+  )
+
+
+    .withFailureHandler(
+
+      function(error) {
+
+
+        saving = false;
+
+        registerButton.disabled =
+          false;
+
+
+        showError(
+          error.message
+        );
+
+      }
+
+    )
+
+
+    .registerTeam(
+      currentClassId,
+      card,
+      name,
+      id1,
+      id2
+    );
+
+}
+
+
+
+// ==========================================
+
+function showError(text) {
+
+  result.innerHTML =
+
+    '<div class="error">' +
+
+    '✗ ' +
+
+    escapeHtml(text) +
+
+    '</div>';
+
+}
+
+
+
+// ==========================================
+
+function escapeHtml(text) {
+
+  const div =
+    document.createElement(
+      "div"
+    );
+
+
+  div.textContent =
+    String(text || "");
+
+
+  return div.innerHTML;
+
+}
+
+
+</script>
+
+
+</body>
+
+</html>

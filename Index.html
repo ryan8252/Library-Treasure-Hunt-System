@@ -1,0 +1,1663 @@
+<!DOCTYPE html>
+
+<html lang="zh-Hant">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0"
+>
+
+<title>圖書館尋寶活動</title>
+
+
+<style>
+
+body {
+
+  margin: 0;
+
+  font-family:
+    Arial,
+    "Microsoft JhengHei",
+    sans-serif;
+
+  background: #f4f6f8;
+
+}
+
+
+.header {
+
+  background: #163447;
+
+  color: white;
+
+  padding: 22px 40px;
+
+  font-size: 30px;
+
+  font-weight: bold;
+
+}
+
+
+.container {
+
+  width: 760px;
+
+  max-width:
+    calc(100% - 40px);
+
+  margin: 40px auto;
+
+  background: white;
+
+  padding: 40px;
+
+  border-radius: 12px;
+
+  box-shadow:
+    0 3px 12px
+    rgba(0,0,0,0.12);
+
+}
+
+
+h2 {
+
+  margin-top: 0;
+
+  margin-bottom: 30px;
+
+}
+
+
+/* =========================================
+   小隊資訊
+========================================= */
+
+.team-panel {
+
+  margin-bottom: 35px;
+
+  padding: 25px;
+
+  background: #eef6fa;
+
+  border-radius: 10px;
+
+}
+
+
+.team-label {
+
+  font-size: 16px;
+
+  color: #666;
+
+  margin-bottom: 7px;
+
+}
+
+
+.team-name {
+
+  font-size: 32px;
+
+  font-weight: bold;
+
+  color: #163447;
+
+}
+
+
+.team-members {
+
+  margin-top: 10px;
+
+  font-size: 19px;
+
+}
+
+
+/* =========================================
+   輸入
+========================================= */
+
+.field {
+
+  margin: 28px 0;
+
+}
+
+
+label {
+
+  display: inline-block;
+
+  width: 170px;
+
+  font-size: 22px;
+
+  font-weight: bold;
+
+}
+
+
+input {
+
+  box-sizing: border-box;
+
+  width: 500px;
+
+  max-width:
+    calc(100% - 180px);
+
+  padding: 14px;
+
+  font-size: 22px;
+
+  border:
+    2px solid #bbb;
+
+  border-radius: 6px;
+
+}
+
+
+input:focus {
+
+  border-color: #1689bd;
+
+  outline: none;
+
+}
+
+
+/* =========================================
+   結果區
+========================================= */
+
+#result {
+
+  margin-top: 35px;
+
+  padding: 28px;
+
+  background: #f0f3f5;
+
+  border-radius: 10px;
+
+  font-size: 20px;
+
+  line-height: 1.8;
+
+}
+
+
+.success {
+
+  color: #168340;
+
+  font-size: 26px;
+
+  font-weight: bold;
+
+}
+
+
+.error {
+
+  color: #c5221f;
+
+  font-size: 23px;
+
+  font-weight: bold;
+
+}
+
+
+.warning {
+
+  color: #d97706;
+
+  font-size: 23px;
+
+  font-weight: bold;
+
+}
+
+
+.complete {
+
+  color: #168340;
+
+  font-size: 30px;
+
+  font-weight: bold;
+
+}
+
+
+/* =========================================
+   進度
+========================================= */
+
+.progress-title {
+
+  margin-top: 20px;
+
+  font-size: 20px;
+
+}
+
+
+.progress-number {
+
+  margin: 5px 0;
+
+  font-size: 42px;
+
+  font-weight: bold;
+
+  color: #1689bd;
+
+}
+
+
+.progress-bar {
+
+  width: 100%;
+
+  height: 18px;
+
+  margin: 12px 0 20px 0;
+
+  background: #d6d6d6;
+
+  border-radius: 20px;
+
+  overflow: hidden;
+
+}
+
+
+.progress-fill {
+
+  height: 100%;
+
+  background: #168340;
+
+  border-radius: 20px;
+
+  transition:
+    width 0.4s ease;
+
+}
+
+
+@media (max-width: 700px) {
+
+  .container {
+
+    padding: 25px;
+
+  }
+
+
+  label {
+
+    display: block;
+
+    width: auto;
+
+    margin-bottom: 10px;
+
+  }
+
+
+  input {
+
+    width: 100%;
+
+    max-width: 100%;
+
+  }
+
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<div class="header">
+
+  圖書館尋寶活動
+
+</div>
+
+
+<div class="container">
+
+
+  <!-- ====================================
+       小隊資訊
+  ===================================== -->
+
+  <div
+    id="teamPanel"
+    class="team-panel"
+  >
+
+    <div class="team-label">
+
+      目前小隊
+
+    </div>
+
+
+    <div
+      id="teamNameDisplay"
+      class="team-name"
+    >
+
+      尚未選擇小隊
+
+    </div>
+
+
+    <div
+      id="teamMembersDisplay"
+      class="team-members"
+    >
+
+      請先完成小隊註冊，或刷借書證。
+
+    </div>
+
+  </div>
+
+
+
+  <!-- ====================================
+       借書證
+  ===================================== -->
+
+  <div class="field">
+
+    <label for="studentId">
+
+      借書證：
+
+    </label>
+
+
+    <input
+      id="studentId"
+      type="text"
+      placeholder="請刷借書證"
+      autocomplete="off"
+      autocapitalize="off"
+      spellcheck="false"
+      inputmode="latin"
+    >
+
+  </div>
+
+
+
+  <!-- ====================================
+       書籍
+  ===================================== -->
+
+  <div class="field">
+
+    <label for="bookBarcode">
+
+      書籍條碼：
+
+    </label>
+
+
+    <input
+      id="bookBarcode"
+      type="text"
+      placeholder="請刷書籍條碼"
+      autocomplete="off"
+      spellcheck="false"
+      inputmode="numeric"
+    >
+
+  </div>
+
+
+
+  <div id="result">
+
+    請先刷借書證開始尋寶。
+
+  </div>
+
+
+</div>
+
+
+
+<script>
+
+
+const studentInput =
+  document.getElementById(
+    "studentId"
+  );
+
+
+const bookInput =
+  document.getElementById(
+    "bookBarcode"
+  );
+
+
+const result =
+  document.getElementById(
+    "result"
+  );
+
+
+const teamNameDisplay =
+  document.getElementById(
+    "teamNameDisplay"
+  );
+
+
+const teamMembersDisplay =
+  document.getElementById(
+    "teamMembersDisplay"
+  );
+
+
+
+let currentStudent = "";
+
+let currentTeam = null;
+
+
+// 註冊完跳過來時
+// 記錄這一隊應該使用哪張借書證
+//
+// 但是注意：
+// 這不代表已經刷過借書證
+let expectedCard = "";
+
+let saving = false;
+
+let currentClassId = "";
+
+
+// ==================================================
+// 網頁啟動
+// ==================================================
+
+window.onload = function() {
+
+  google.script.url.getLocation(
+
+    function(location) {
+
+      // 從網址取得班級
+      // 例如 ?class=603
+      const classId =
+        location.parameter.class
+          ? String(
+              location.parameter.class
+            ).trim()
+          : "";
+
+
+      // 從網址取得剛註冊的借書證
+      const registeredCard =
+        location.parameter.registered
+          ? String(
+              location.parameter.registered
+            )
+              .trim()
+              .toUpperCase()
+          : "";
+
+
+      // ==========================================
+      // 沒有 class
+      // ==========================================
+
+      if (!classId) {
+
+        result.innerHTML =
+
+          '<div class="error">' +
+          '✗ 網址沒有指定班級' +
+          '</div>';
+
+        return;
+
+      }
+
+
+      // ==========================================
+      // 先確認班級是否合法
+      // ==========================================
+
+      google.script.run
+
+        .withSuccessHandler(
+
+          function(info) {
+
+            if (!info.valid) {
+
+              result.innerHTML =
+
+                '<div class="error">' +
+                '✗ 班級代碼不正確' +
+                '</div>';
+
+              return;
+
+            }
+
+
+            // ★ 最重要的一行
+            currentClassId =
+              info.classId;
+
+
+            // ======================================
+            // 剛註冊完跳過來
+            // ======================================
+
+            if (registeredCard) {
+
+              expectedCard =
+                registeredCard;
+
+
+              loadRegisteredTeam(
+                registeredCard
+              );
+
+            }
+
+            else {
+
+              studentInput.focus();
+
+            }
+
+          }
+
+        )
+
+        .withFailureHandler(
+
+          function(error) {
+
+            result.innerHTML =
+
+              '<div class="error">' +
+              '✗ 班級讀取失敗' +
+              '</div>' +
+
+              escapeHtml(
+                error.message
+              );
+
+          }
+
+        )
+
+        .getClassInfo(
+          classId
+        );
+
+    }
+
+  );
+
+};
+
+
+// ==================================================
+// 註冊完之後
+// 先把小隊名稱顯示出來
+//
+// 但 currentStudent 仍然保持空白
+//
+// 所以現在還不能刷書計分
+// ==================================================
+
+function loadRegisteredTeam(
+  libraryCard
+) {
+
+  teamNameDisplay.textContent =
+    "載入中……";
+
+
+  teamMembersDisplay.textContent =
+    "";
+
+
+  google.script.run
+
+
+    .withSuccessHandler(
+
+      function(team) {
+
+
+        if (!team) {
+
+          teamNameDisplay.textContent =
+            "找不到小隊資料";
+
+
+          teamMembersDisplay.textContent =
+            "";
+
+
+          result.innerHTML =
+
+            '<div class="error">' +
+
+            '✗ 找不到這個班級的小隊資料' +
+
+            '</div>';
+
+
+          studentInput.focus();
+
+
+          return;
+
+        }
+
+
+        // ======================================
+        // 找到小隊
+        // ======================================
+
+        currentTeam =
+          team;
+
+
+        showTeam(
+          team
+        );
+
+
+        result.innerHTML =
+
+          '<div class="success">' +
+
+          '✓ 小隊註冊完成' +
+
+          '</div>' +
+
+          '<br>' +
+
+          '接下來請刷剛才登記的借書證，' +
+
+          '驗證成功後即可開始尋寶。';
+
+
+        // 注意：
+        // 顯示小隊不等於借書證已驗證
+        currentStudent = "";
+
+
+        studentInput.value = "";
+
+
+        studentInput.focus();
+
+      }
+
+    )
+
+
+    .withFailureHandler(
+
+      function(error) {
+
+        result.innerHTML =
+
+          '<div class="error">' +
+
+          '✗ 小隊資料讀取失敗' +
+
+          '</div>' +
+
+          escapeHtml(
+            error.message
+          );
+
+
+        studentInput.focus();
+
+      }
+
+    )
+
+
+    .getTeamByCard(
+      currentClassId,
+      libraryCard
+    );
+
+}
+
+
+
+// ==================================================
+// 顯示隊伍
+// ==================================================
+
+function showTeam(
+  team
+) {
+
+
+  teamNameDisplay.textContent =
+    team.teamName;
+
+
+  teamMembersDisplay.textContent =
+
+    "隊員：" +
+
+    team.member1Id +
+
+    "、" +
+
+    team.member2Id;
+
+}
+
+
+
+// ==================================================
+// 全形英數字轉半形
+// ==================================================
+
+function normalizeScan(
+  value
+) {
+
+
+  return String(
+    value || ""
+  )
+
+    .trim()
+
+    .replace(
+      /[０-９Ａ-Ｚａ-ｚ]/g,
+
+      function(char) {
+
+        return String.fromCharCode(
+          char.charCodeAt(0) -
+          0xFEE0
+        );
+
+      }
+    )
+
+    .toUpperCase();
+
+}
+
+
+
+// ==================================================
+// 判斷掃到的是學生還是書
+// ==================================================
+
+function classifyBarcode(
+  value
+) {
+
+
+  value =
+    normalizeScan(
+      value
+    );
+
+
+  // 台灣身分證
+  const studentPattern =
+    /^[A-Z][12][0-9]{8}$/;
+
+
+  // 書籍：純數字
+  const bookPattern =
+    /^[0-9]+$/;
+
+
+
+  if (
+    studentPattern.test(
+      value
+    )
+  ) {
+
+    return "student";
+
+  }
+
+
+  if (
+    bookPattern.test(
+      value
+    )
+  ) {
+
+    return "book";
+
+  }
+
+
+  return "unknown";
+
+}
+
+
+
+// ==================================================
+// 統一處理掃描
+// ==================================================
+
+function processScan(
+  rawValue
+) {
+
+
+  const value =
+    normalizeScan(
+      rawValue
+    );
+
+
+  if (!value) {
+
+    return;
+
+  }
+
+
+  const type =
+    classifyBarcode(
+      value
+    );
+
+
+
+  // =================================================
+  // 借書證
+  // =================================================
+
+  if (type === "student") {
+
+
+    verifyStudentCard(
+      value
+    );
+
+
+    return;
+
+  }
+
+
+
+  // =================================================
+  // 書籍
+  // =================================================
+
+  if (type === "book") {
+
+
+    if (!currentStudent) {
+
+
+      bookInput.value = "";
+
+
+      result.innerHTML =
+
+        '<div class="error">' +
+
+        '✗ 尚未驗證借書證' +
+
+        '</div>' +
+
+        '<br>' +
+
+        '請先刷借書證，' +
+
+        '再刷找到的書籍。';
+
+
+      studentInput.focus();
+
+
+      return;
+
+    }
+
+
+    saveBook(
+      currentStudent,
+      value
+    );
+
+
+    return;
+
+  }
+
+
+
+  // =================================================
+  // 不明格式
+  // =================================================
+
+  result.innerHTML =
+
+    '<div class="error">' +
+
+    '✗ 無法辨識條碼' +
+
+    '</div>' +
+
+    '<br>' +
+
+    '掃描內容：' +
+
+    escapeHtml(
+      value
+    );
+
+
+  bookInput.value = "";
+
+  studentInput.focus();
+
+}
+
+
+
+// ==================================================
+// 驗證借書證
+// ==================================================
+
+function verifyStudentCard(
+  scannedCard
+) {
+
+
+  // ============================================
+  // 如果是剛註冊後跳來
+  // 必須刷剛才註冊的那張借書證
+  // ============================================
+
+  if (
+    expectedCard &&
+    scannedCard !== expectedCard
+  ) {
+
+
+    studentInput.value = "";
+
+
+    result.innerHTML =
+
+      '<div class="error">' +
+
+      '✗ 借書證不正確' +
+
+      '</div>' +
+
+      '<br>' +
+
+      '這張借書證不是「' +
+
+      escapeHtml(
+        currentTeam
+          ? currentTeam.teamName
+          : "目前小隊"
+      ) +
+
+      '」登記的借書證。' +
+
+      '<br>' +
+
+      '請重新刷正確的借書證。';
+
+
+    studentInput.focus();
+
+
+    return;
+
+  }
+
+
+
+  studentInput.value =
+    scannedCard;
+
+
+  result.innerHTML =
+
+    "正在驗證借書證……";
+
+
+
+  google.script.run
+
+
+    .withSuccessHandler(
+
+      function(data) {
+
+
+        // ======================================
+        // 沒註冊
+        // ======================================
+
+        if (!data.registered) {
+
+
+          currentStudent = "";
+
+
+          studentInput.value = "";
+
+
+          result.innerHTML =
+
+            '<div class="error">' +
+
+            '✗ 尚未完成小隊註冊' +
+
+            '</div>' +
+
+            '<br>' +
+
+            '請先完成小隊註冊。';
+
+
+          studentInput.focus();
+
+
+          return;
+
+        }
+
+
+
+        // ======================================
+        // 驗證成功
+        // ======================================
+
+        currentStudent =
+          scannedCard;
+
+
+        currentTeam = {
+
+          teamName:
+            data.teamName,
+
+          member1Id:
+            data.member1Id,
+
+          member2Id:
+            data.member2Id
+
+        };
+
+
+        showTeam(
+          currentTeam
+        );
+
+
+        showProgress(
+          data
+        );
+
+
+        bookInput.value = "";
+
+        bookInput.focus();
+
+      }
+
+    )
+
+
+    .withFailureHandler(
+
+      function(error) {
+
+
+        currentStudent = "";
+
+
+        result.innerHTML =
+
+          '<div class="error">' +
+
+          '✗ 驗證失敗' +
+
+          '</div>' +
+
+          escapeHtml(
+            error.message
+          );
+
+
+        studentInput.focus();
+
+      }
+
+    )
+
+
+    .getStudentProgress(
+      currentClassId,
+      scannedCard
+    );
+
+}
+
+
+
+// ==================================================
+// 借書證驗證成功後顯示進度
+// ==================================================
+
+function showProgress(
+  data
+) {
+
+
+  if (data.completed) {
+
+
+    result.innerHTML =
+
+      '<div class="complete">' +
+
+      '🎉 尋寶完成！' +
+
+      '</div>' +
+
+      '<div class="progress-title">' +
+
+      '尋寶進度' +
+
+      '</div>' +
+
+      '<div class="progress-number">' +
+
+      data.foundCount +
+
+      ' / ' +
+
+      data.totalCount +
+
+      '</div>' +
+
+      makeProgressBar(
+        data.foundCount,
+        data.totalCount
+      ) +
+
+      '恭喜你們已經完成尋寶！';
+
+
+    return;
+
+  }
+
+
+
+  result.innerHTML =
+
+    '<div class="success">' +
+
+    '✓ 借書證驗證成功' +
+
+    '</div>' +
+
+    '<div class="progress-title">' +
+
+    '目前尋寶進度' +
+
+    '</div>' +
+
+    '<div class="progress-number">' +
+
+    data.foundCount +
+
+    ' / ' +
+
+    data.totalCount +
+
+    '</div>' +
+
+    makeProgressBar(
+      data.foundCount,
+      data.totalCount
+    ) +
+
+    '請開始尋找書籍！';
+
+}
+
+
+
+// ==================================================
+// 刷書
+// ==================================================
+
+function saveBook(
+  studentId,
+  bookBarcode
+) {
+
+
+  if (saving) {
+
+    return;
+
+  }
+
+
+  saving = true;
+
+
+  bookInput.value =
+    bookBarcode;
+
+
+  result.innerHTML =
+
+    "正在確認書籍……";
+
+
+
+  google.script.run
+
+
+    .withSuccessHandler(
+
+      function(data) {
+
+
+        saving = false;
+
+
+        bookInput.value = "";
+
+
+        // ======================================
+        // 全部完成
+        // ======================================
+
+        if (data.completed) {
+
+
+          result.innerHTML =
+
+            '<div class="complete">' +
+
+            '🎉 尋寶完成！' +
+
+            '</div>' +
+
+            '<div class="progress-title">' +
+
+            '尋寶進度' +
+
+            '</div>' +
+
+            '<div class="progress-number">' +
+
+            data.foundCount +
+
+            ' / ' +
+
+            data.totalCount +
+
+            '</div>' +
+
+            makeProgressBar(
+              data.foundCount,
+              data.totalCount
+            ) +
+
+            '恭喜「' +
+
+            escapeHtml(
+              currentTeam.teamName
+            ) +
+
+            '」完成尋寶！';
+
+
+          bookInput.focus();
+
+
+          return;
+
+        }
+
+
+
+        // ======================================
+        // 重複書
+        // ======================================
+
+        if (data.isDuplicate) {
+
+
+          result.innerHTML =
+
+            '<div class="warning">' +
+
+            '⚠ 這本書已經找過了' +
+
+            '</div>' +
+
+            '<div class="progress-title">' +
+
+            '目前尋寶進度' +
+
+            '</div>' +
+
+            '<div class="progress-number">' +
+
+            data.foundCount +
+
+            ' / ' +
+
+            data.totalCount +
+
+            '</div>' +
+
+            makeProgressBar(
+              data.foundCount,
+              data.totalCount
+            ) +
+
+            '請尋找其他書籍。';
+
+
+          bookInput.focus();
+
+
+          return;
+
+        }
+
+
+
+        // ======================================
+        // 新書成功
+        // ======================================
+
+        result.innerHTML =
+
+          '<div class="success">' +
+
+          '✓ 找到一本！' +
+
+          '</div>' +
+
+          '<div class="progress-title">' +
+
+          '目前尋寶進度' +
+
+          '</div>' +
+
+          '<div class="progress-number">' +
+
+          data.foundCount +
+
+          ' / ' +
+
+          data.totalCount +
+
+          '</div>' +
+
+          makeProgressBar(
+            data.foundCount,
+            data.totalCount
+          ) +
+
+          '請繼續尋找下一本書。';
+
+
+        bookInput.focus();
+
+      }
+
+    )
+
+
+    .withFailureHandler(
+
+      function(error) {
+
+
+        saving = false;
+
+
+        bookInput.value = "";
+
+
+        result.innerHTML =
+
+          '<div class="error">' +
+
+          '✗ 這本書不對' +
+
+          '</div>' +
+
+          '<br>' +
+
+          escapeHtml(
+            error.message
+          ) +
+
+          '<br><br>' +
+
+          '請繼續尋找指定書籍。';
+
+
+        bookInput.focus();
+
+      }
+
+    )
+
+
+    .saveBorrowRecord(
+      currentClassId,
+      studentId,
+      bookBarcode
+    );
+
+}
+
+
+
+// ==================================================
+// 進度條
+// ==================================================
+
+function makeProgressBar(
+  found,
+  total
+) {
+
+
+  let percentage = 0;
+
+
+  if (total > 0) {
+
+    percentage =
+      found /
+      total *
+      100;
+
+  }
+
+
+  percentage =
+    Math.min(
+      100,
+      percentage
+    );
+
+
+  return (
+
+    '<div class="progress-bar">' +
+
+      '<div ' +
+
+        'class="progress-fill" ' +
+
+        'style="width:' +
+
+        percentage +
+
+        '%">' +
+
+      '</div>' +
+
+    '</div>'
+
+  );
+
+}
+
+
+
+// ==================================================
+// 借書證輸入框
+// ==================================================
+
+studentInput.addEventListener(
+
+  "keydown",
+
+  function(event) {
+
+
+    if (
+      event.key === "Enter"
+    ) {
+
+
+      event.preventDefault();
+
+
+      processScan(
+        studentInput.value
+      );
+
+    }
+
+  }
+
+);
+
+
+
+// ==================================================
+// 書籍輸入框
+// ==================================================
+
+bookInput.addEventListener(
+
+  "keydown",
+
+  function(event) {
+
+
+    if (
+      event.key === "Enter"
+    ) {
+
+
+      event.preventDefault();
+
+
+      processScan(
+        bookInput.value
+      );
+
+    }
+
+  }
+
+);
+
+
+
+// ==================================================
+// HTML Escape
+// ==================================================
+
+function escapeHtml(
+  text
+) {
+
+
+  const div =
+    document.createElement(
+      "div"
+    );
+
+
+  div.textContent =
+    String(
+      text || ""
+    );
+
+
+  return div.innerHTML;
+
+}
+
+
+</script>
+
+
+</body>
+
+</html>

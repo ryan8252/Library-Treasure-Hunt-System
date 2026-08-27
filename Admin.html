@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+
+<html lang="zh-Hant">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0"
+>
+
+<title>尋寶書籍管理</title>
+
+
+<style>
+
+body {
+
+  margin: 0;
+
+  font-family:
+    Arial,
+    "Microsoft JhengHei",
+    sans-serif;
+
+  background: #f4f6f8;
+
+}
+
+
+.header {
+
+  background: #163447;
+
+  color: white;
+
+  padding: 22px 40px;
+
+  font-size: 28px;
+
+  font-weight: bold;
+
+}
+
+
+.container {
+
+  width: 650px;
+
+  max-width:
+    calc(100% - 40px);
+
+  margin: 40px auto;
+
+}
+
+
+.card {
+
+  background: white;
+
+  padding: 30px;
+
+  border-radius: 12px;
+
+  box-shadow:
+    0 3px 12px
+    rgba(0, 0, 0, 0.1);
+
+}
+
+
+h2 {
+
+  margin-top: 0;
+
+}
+
+
+.count {
+
+  font-size: 24px;
+
+  font-weight: bold;
+
+  margin-bottom: 25px;
+
+}
+
+
+.scan-input {
+
+  box-sizing: border-box;
+
+  width: 100%;
+
+  padding: 16px;
+
+  font-size: 22px;
+
+  border:
+    2px solid #aaa;
+
+  border-radius: 7px;
+
+}
+
+
+.scan-input:focus {
+
+  border-color: #1689bd;
+
+  outline: none;
+
+}
+
+
+.message {
+
+  min-height: 30px;
+
+  margin-top: 15px;
+
+  font-size: 18px;
+
+}
+
+
+.success {
+
+  color: #168340;
+
+  font-weight: bold;
+
+}
+
+
+.error {
+
+  color: #c5221f;
+
+  font-weight: bold;
+
+}
+
+
+.list {
+
+  margin-top: 30px;
+
+}
+
+
+.book-row {
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content:
+    space-between;
+
+  padding: 16px 5px;
+
+  border-bottom:
+    1px solid #ddd;
+
+}
+
+
+.barcode {
+
+  font-family: monospace;
+
+  font-size: 24px;
+
+  font-weight: bold;
+
+}
+
+
+.delete-btn {
+
+  padding: 9px 18px;
+
+  border: none;
+
+  border-radius: 5px;
+
+  background: #c5221f;
+
+  color: white;
+
+  font-size: 16px;
+
+  cursor: pointer;
+
+}
+
+
+.delete-btn:hover {
+
+  opacity: 0.85;
+
+}
+
+
+.empty {
+
+  padding: 25px 0;
+
+  color: #777;
+
+  text-align: center;
+
+}
+
+
+.full {
+
+  margin-top: 20px;
+
+  padding: 15px;
+
+  background: #fff2f0;
+
+  color: #c5221f;
+
+  border-radius: 6px;
+
+  font-weight: bold;
+
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<div class="header">
+
+  尋寶書籍管理
+
+</div>
+
+
+<div class="container">
+
+  <div class="card">
+
+
+    <div class="count">
+
+      已設定：
+      <span id="count">0</span>
+      /
+      <span id="maxCount">0</span>
+      本
+
+    </div>
+
+
+
+    <input
+      id="barcodeInput"
+      class="scan-input"
+      type="text"
+      placeholder="請掃描要加入的書籍條碼"
+      autocomplete="off"
+      inputmode="numeric"
+      spellcheck="false"
+    >
+
+
+    <div
+      id="message"
+      class="message"
+    ></div>
+
+
+    <div
+      id="fullMessage"
+    ></div>
+
+
+    <div
+      id="bookList"
+      class="list"
+    ></div>
+
+
+  </div>
+
+</div>
+
+
+
+<script>
+
+
+const barcodeInput =
+  document.getElementById(
+    "barcodeInput"
+  );
+
+
+const message =
+  document.getElementById(
+    "message"
+  );
+
+
+let books = [];
+
+let saving = false;
+
+let maxBooks = 0;
+
+// =======================================
+// 啟動
+// =======================================
+
+window.onload = function() {
+
+  google.script.run
+    .withSuccessHandler(function(config) {
+
+      maxBooks = config.maxBooks;
+
+      document
+        .getElementById("maxCount")
+        .textContent = maxBooks;
+
+      loadBooks();
+
+      barcodeInput.focus();
+
+    })
+    .getTreasureConfig();
+
+};
+
+
+
+// =======================================
+// 掃描完成按 Enter
+// =======================================
+
+barcodeInput.addEventListener(
+  "keydown",
+  function(event) {
+
+
+    if (event.key !== "Enter") {
+
+      return;
+
+    }
+
+
+    event.preventDefault();
+
+
+    addBook();
+
+  }
+);
+
+
+
+// =======================================
+// 讀取目前清單
+// =======================================
+
+function loadBooks() {
+
+
+  google.script.run
+
+
+    .withSuccessHandler(
+
+      function(data) {
+
+        books = data;
+
+        renderBooks();
+
+      }
+
+    )
+
+
+    .withFailureHandler(
+
+      function(error) {
+
+        message.innerHTML =
+
+          '<span class="error">' +
+
+          escapeHtml(
+            error.message
+          ) +
+
+          '</span>';
+
+      }
+
+    )
+
+
+    .getTreasureBooks();
+
+}
+
+
+
+// =======================================
+// 新增書籍
+// =======================================
+
+function addBook() {
+
+
+  if (saving) {
+
+    return;
+
+  }
+
+
+  let barcode =
+    normalizeBarcode(
+      barcodeInput.value
+    );
+
+
+  barcodeInput.value = "";
+
+
+  if (!barcode) {
+
+    barcodeInput.focus();
+
+    return;
+
+  }
+
+
+  if (books.length >= maxBooks) {
+    message.innerHTML =
+
+      '<span class="error">' +
+
+      '✗ 已經有 ' + maxBooks + ' 本書，請先刪除一本舊書' +
+
+      '</span>';
+
+
+    barcodeInput.focus();
+
+    return;
+
+  }
+
+
+  saving = true;
+
+
+  message.textContent =
+    "新增中……";
+
+
+
+  google.script.run
+
+
+    .withSuccessHandler(
+
+      function(data) {
+
+
+        saving = false;
+
+
+        message.innerHTML =
+
+          '<span class="success">' +
+
+          '✓ 已新增：' +
+
+          escapeHtml(
+            data.barcode
+          ) +
+
+          '</span>';
+
+
+        loadBooks();
+
+
+        barcodeInput.focus();
+
+      }
+
+    )
+
+
+    .withFailureHandler(
+
+      function(error) {
+
+
+        saving = false;
+
+
+        message.innerHTML =
+
+          '<span class="error">' +
+
+          '✗ ' +
+
+          escapeHtml(
+            error.message
+          ) +
+
+          '</span>';
+
+
+        barcodeInput.focus();
+
+      }
+
+    )
+
+
+    .addTreasureBook(
+      barcode
+    );
+
+}
+
+
+
+// =======================================
+// 刪除書籍
+// =======================================
+
+function removeBook(barcode) {
+
+
+  const ok =
+    confirm(
+      "確定要刪除書籍條碼 " +
+      barcode +
+      " 嗎？"
+    );
+
+
+  if (!ok) {
+
+    barcodeInput.focus();
+
+    return;
+
+  }
+
+
+  google.script.run
+
+
+    .withSuccessHandler(
+
+      function() {
+
+
+        message.innerHTML =
+
+          '<span class="success">' +
+
+          '✓ 已刪除：' +
+
+          escapeHtml(
+            barcode
+          ) +
+
+          '</span>';
+
+
+        loadBooks();
+
+
+        barcodeInput.focus();
+
+      }
+
+    )
+
+
+    .withFailureHandler(
+
+      function(error) {
+
+
+        message.innerHTML =
+
+          '<span class="error">' +
+
+          '✗ ' +
+
+          escapeHtml(
+            error.message
+          ) +
+
+          '</span>';
+
+
+        barcodeInput.focus();
+
+      }
+
+    )
+
+
+    .deleteTreasureBook(
+      barcode
+    );
+
+}
+
+
+
+// =======================================
+// 顯示書籍清單
+// =======================================
+
+function renderBooks() {
+
+
+  const list =
+    document.getElementById(
+      "bookList"
+    );
+
+
+  const count =
+    document.getElementById(
+      "count"
+    );
+
+
+  const fullMessage =
+    document.getElementById(
+      "fullMessage"
+    );
+
+
+  count.textContent =
+    books.length;
+
+
+  list.innerHTML = "";
+
+
+  if (books.length === 0) {
+
+    list.innerHTML =
+
+      '<div class="empty">' +
+
+      '目前還沒有設定任何書籍' +
+
+      '</div>';
+
+  }
+
+
+
+  books.forEach(
+
+    function(barcode) {
+
+
+      const row =
+        document.createElement(
+          "div"
+        );
+
+
+      row.className =
+        "book-row";
+
+
+      const barcodeText =
+        document.createElement(
+          "div"
+        );
+
+
+      barcodeText.className =
+        "barcode";
+
+
+      barcodeText.textContent =
+        barcode;
+
+
+
+      const button =
+        document.createElement(
+          "button"
+        );
+
+
+      button.className =
+        "delete-btn";
+
+
+      button.textContent =
+        "刪除";
+
+
+      button.onclick =
+        function() {
+
+          removeBook(
+            barcode
+          );
+
+        };
+
+
+
+      row.appendChild(
+        barcodeText
+      );
+
+
+      row.appendChild(
+        button
+      );
+
+
+      list.appendChild(
+        row
+      );
+
+    }
+
+  );
+
+
+
+  // 已滿 100 本
+  if (books.length >= maxBooks) {
+
+    fullMessage.innerHTML =
+
+      '<div class="full">' +
+
+      '目前已滿 ' + maxBooks +' 本。' +
+      
+      '如要更換書籍，請先刪除舊書，再掃描新書。' +
+
+      '</div>';
+
+  }
+
+  else {
+
+    fullMessage.innerHTML = "";
+
+  }
+
+
+  barcodeInput.focus();
+
+}
+
+
+
+// =======================================
+// 全形數字轉正常數字
+// =======================================
+
+function normalizeBarcode(value) {
+
+
+  return String(
+    value || ""
+  )
+
+    .trim()
+
+    .replace(
+      /[０-９]/g,
+      function(char) {
+
+        return String.fromCharCode(
+          char.charCodeAt(0)
+          -
+          0xFEE0
+        );
+
+      }
+    );
+
+}
+
+
+
+// =======================================
+// 防止 HTML 特殊字元
+// =======================================
+
+function escapeHtml(text) {
+
+
+  const div =
+    document.createElement(
+      "div"
+    );
+
+
+  div.textContent =
+    String(
+      text || ""
+    );
+
+
+  return div.innerHTML;
+
+}
+
+
+</script>
+
+
+</body>
+
+</html>
