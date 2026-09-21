@@ -11,7 +11,7 @@
   content="width=device-width, initial-scale=1.0"
 >
 
-<title>圖書館尋寶活動</title>
+<title>圖書館尋寶活動・老師體驗版</title>
 
 
 <style>
@@ -106,6 +106,8 @@ h2 {
 
 .team-name {
 
+  overflow-wrap: anywhere;
+
   font-size: 32px;
 
   font-weight: bold;
@@ -116,6 +118,8 @@ h2 {
 
 
 .team-members {
+
+  overflow-wrap: anywhere;
 
   margin-top: 10px;
 
@@ -340,7 +344,7 @@ input:focus {
 
 <div class="header">
 
-  圖書館尋寶活動
+  圖書館尋寶活動・老師體驗版
 
 </div>
 
@@ -499,7 +503,7 @@ let expectedCard = "";
 
 let saving = false;
 
-let currentClassId = "";
+
 
 
 // ==================================================
@@ -507,129 +511,15 @@ let currentClassId = "";
 // ==================================================
 
 window.onload = function() {
-
-  google.script.url.getLocation(
-
-    function(location) {
-
-      // 從網址取得班級
-      // 例如 ?class=603
-      const classId =
-        location.parameter.class
-          ? String(
-              location.parameter.class
-            ).trim()
-          : "";
-
-
-      // 從網址取得剛註冊的借書證
-      const registeredCard =
-        location.parameter.registered
-          ? String(
-              location.parameter.registered
-            )
-              .trim()
-              .toUpperCase()
-          : "";
-
-
-      // ==========================================
-      // 沒有 class
-      // ==========================================
-
-      if (!classId) {
-
-        result.innerHTML =
-
-          '<div class="error">' +
-          '✗ 網址沒有指定班級' +
-          '</div>';
-
-        return;
-
-      }
-
-
-      // ==========================================
-      // 先確認班級是否合法
-      // ==========================================
-
-      google.script.run
-
-        .withSuccessHandler(
-
-          function(info) {
-
-            if (!info.valid) {
-
-              result.innerHTML =
-
-                '<div class="error">' +
-                '✗ 班級代碼不正確' +
-                '</div>';
-
-              return;
-
-            }
-
-
-            // ★ 最重要的一行
-            currentClassId =
-              info.classId;
-
-
-            // ======================================
-            // 剛註冊完跳過來
-            // ======================================
-
-            if (registeredCard) {
-
-              expectedCard =
-                registeredCard;
-
-
-              loadRegisteredTeam(
-                registeredCard
-              );
-
-            }
-
-            else {
-
-              studentInput.focus();
-
-            }
-
-          }
-
-        )
-
-        .withFailureHandler(
-
-          function(error) {
-
-            result.innerHTML =
-
-              '<div class="error">' +
-              '✗ 班級讀取失敗' +
-              '</div>' +
-
-              escapeHtml(
-                error.message
-              );
-
-          }
-
-        )
-
-        .getClassInfo(
-          classId
-        );
-
+  google.script.url.getLocation(function(location) {
+    const registeredCard = normalizeScan(location.parameter.registered || "");
+    if (registeredCard) {
+      expectedCard = registeredCard;
+      loadRegisteredTeam(registeredCard);
+    } else {
+      studentInput.focus();
     }
-
-  );
-
+  });
 };
 
 
@@ -676,7 +566,7 @@ function loadRegisteredTeam(
 
             '<div class="error">' +
 
-            '✗ 找不到這個班級的小隊資料' +
+            '✗ 找不到小隊資料' +
 
             '</div>';
 
@@ -757,7 +647,6 @@ function loadRegisteredTeam(
 
 
     .getTeamByCard(
-      currentClassId,
       libraryCard
     );
 
@@ -1184,7 +1073,6 @@ function verifyStudentCard(
 
 
     .getStudentProgress(
-      currentClassId,
       scannedCard
     );
 
@@ -1504,7 +1392,6 @@ function saveBook(
 
 
     .saveBorrowRecord(
-      currentClassId,
       studentId,
       bookBarcode
     );

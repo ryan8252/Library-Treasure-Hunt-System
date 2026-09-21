@@ -168,6 +168,8 @@ button:disabled {
 
 #result {
 
+  overflow-wrap: anywhere;
+
   margin-top: 25px;
 
   padding: 20px;
@@ -214,7 +216,7 @@ button:disabled {
 
 <div class="header">
 
-  圖書館尋寶活動
+  圖書館尋寶活動・老師體驗版
 
 </div>
 
@@ -224,17 +226,7 @@ button:disabled {
 
   <h2>小隊註冊</h2>
 
-  <div
-    id="classDisplay"
-    style="
-      font-size:26px;
-      font-weight:bold;
-      margin-bottom:30px;
-      color:#1689bd;
-    "
-  >
-    正在讀取班級……
-  </div>
+
 
 
 
@@ -277,7 +269,7 @@ button:disabled {
         ②
       </span>
 
-      小隊名稱（5個字以內）
+      小隊名稱
 
     </label>
 
@@ -287,7 +279,6 @@ button:disabled {
       type="text"
       placeholder="例如：皮卡丘隊"
       autocomplete="off"
-      maxlength="5"
     >
 
   </div>
@@ -304,7 +295,7 @@ button:disabled {
         ③
       </span>
 
-      隊員一學號
+      隊員一姓名或編號
 
     </label>
 
@@ -312,10 +303,8 @@ button:disabled {
     <input
       id="member1"
       type="text"
-      placeholder="例如：60501"
+      placeholder="例如：王小明"
       autocomplete="off"
-      inputmode="numeric"
-      maxlength="5"
     >
 
   </div>
@@ -332,7 +321,7 @@ button:disabled {
         ④
       </span>
 
-      隊員二學號
+      隊員二姓名或編號
 
     </label>
 
@@ -340,10 +329,8 @@ button:disabled {
     <input
       id="member2"
       type="text"
-      placeholder="例如：60502"
+      placeholder="例如：陳老師"
       autocomplete="off"
-      inputmode="numeric"
-      maxlength="5"
     >
 
   </div>
@@ -414,79 +401,7 @@ const registerButton =
 
 let saving = false;
 
-let currentClassId = "";
-
-
-
-window.onload =
-  function() {
-
-    google.script.url.getLocation(
-
-      function(location) {
-
-        const classId =
-          location.parameter.class
-            ? String(
-                location.parameter.class
-              ).trim()
-            : "";
-
-
-        google.script.run
-
-          .withSuccessHandler(
-
-            function(info) {
-
-              if (!info.valid) {
-
-                result.innerHTML =
-
-                  '<div class="error">' +
-
-                  '✗ 班級網址不正確' +
-
-                  '</div>';
-
-                return;
-
-              }
-
-
-              currentClassId =
-                info.classId;
-
-
-              document
-                .getElementById(
-                  "classDisplay"
-                )
-                .textContent =
-                info.className;
-
-
-              libraryCard.focus();
-
-            }
-
-          )
-
-          .getClassInfo(
-            classId
-          );
-
-      }
-
-    );
-
-  };
-
-
-
-// ==========================================
-// 借書證掃完，自動跳小隊名稱
-// ==========================================
+window.onload = function() { libraryCard.focus(); };
 
 libraryCard.addEventListener(
   "keydown",
@@ -670,7 +585,7 @@ function submitRegistration() {
   if (!id1) {
 
     showError(
-      "請輸入隊員一學號"
+      "請輸入隊員一姓名或編號"
     );
 
     member1.focus();
@@ -683,7 +598,7 @@ function submitRegistration() {
   if (!id2) {
 
     showError(
-      "請輸入隊員二學號"
+      "請輸入隊員二姓名或編號"
     );
 
     member2.focus();
@@ -768,11 +683,7 @@ function submitRegistration() {
 
             const targetUrl =
               url +
-              '?class=' +
-              encodeURIComponent(
-                currentClassId
-              ) +
-              '&registered=' +
+              '?registered=' +
               encodeURIComponent(
                 data.libraryCard
               );
@@ -814,7 +725,6 @@ function submitRegistration() {
 
 
     .registerTeam(
-      currentClassId,
       card,
       name,
       id1,

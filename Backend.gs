@@ -1,103 +1,11 @@
+// 老師體驗版：小隊與紀錄存放於 DemoTeams、DemoBorrowRecords。
 // 總共書的數量
 const MAX_TREASURE_BOOKS = 100;
 
-// 每位學生需要找到幾本
+// 每個小隊需要找到幾本
 const REQUIRED_BOOKS_PER_STUDENT = 10;
 
 
-const VALID_CLASSES = [
-  "501", "502", "503", "504", "505", "506", "507",
-  "601", "602", "603", "604", "605", "606", "607"
-];
-
-
-const CLASS_NAMES = {
-
-  "501": "五年一班",
-  "502": "五年二班",
-  "503": "五年三班",
-  "504": "五年四班",
-  "505": "五年五班",
-  "506": "五年六班",
-  "507": "五年七班",
-
-  "601": "六年一班",
-  "602": "六年二班",
-  "603": "六年三班",
-  "604": "六年四班",
-  "605": "六年五班",
-  "606": "六年六班",
-  "607": "六年七班"
-
-};
-
-
-function normalizeClassId_(classId) {
-
-  return String(classId || "")
-    .trim();
-
-}
-
-
-function getClassInfo(classId) {
-
-  classId =
-    normalizeClassId_(classId);
-
-
-  if (
-    !VALID_CLASSES.includes(classId)
-  ) {
-
-    return {
-
-      valid: false
-
-    };
-
-  }
-
-
-  return {
-
-    valid: true,
-
-    classId:
-      classId,
-
-    className:
-      CLASS_NAMES[classId]
-
-  };
-
-}
-
-
-function assertValidClass_(classId) {
-
-  classId =
-    normalizeClassId_(classId);
-
-
-  if (
-    !VALID_CLASSES.includes(classId)
-  ) {
-
-    throw new Error(
-      "班級代碼不正確"
-    );
-
-  }
-
-
-  return classId;
-
-}
-
-// ======================================================
-// 讀取設定
-// ======================================================
 function getTreasureConfig() {
 
   return {
@@ -190,7 +98,7 @@ function getTeamsSheet() {
 
   let sheet =
     spreadsheet.getSheetByName(
-      "Teams"
+      "DemoTeams"
     );
 
 
@@ -198,32 +106,19 @@ function getTeamsSheet() {
 
     sheet =
       spreadsheet.insertSheet(
-        "Teams"
+        "DemoTeams"
       );
 
 
     sheet
-      .getRange(1, 1, 1, 6)
+      .getRange(1, 1, 1, 5)
       .setValues([[
         "library_card",
         "team_name",
-        "member1_id",
-        "member2_id",
-        "registered_at",
-        "class_id"
+        "member1_name",
+        "member2_name",
+        "registered_at"
       ]]);
-
-  }
-
-
-  // 舊版 Teams 自動補 class_id
-  if (
-    sheet.getRange(1, 6).getValue() === ""
-  ) {
-
-    sheet
-      .getRange(1, 6)
-      .setValue("class_id");
 
   }
 
@@ -234,13 +129,11 @@ function getTeamsSheet() {
 
 
   sheet
-    .getRange("C:D")
+    .getRange("B:D")
     .setNumberFormat("@");
 
 
-  sheet
-    .getRange("F:F")
-    .setNumberFormat("@");
+
 
 
   return sheet;
@@ -253,12 +146,8 @@ function getTeamsSheet() {
 // ======================================================
 
 function getTeamByCard(
-  classId,
   libraryCard
 ) {
-
-  classId =
-    assertValidClass_(classId);
 
 
   libraryCard =
@@ -288,7 +177,7 @@ function getTeamByCard(
         2,
         1,
         lastRow - 1,
-        6
+        5
       )
       .getDisplayValues();
 
@@ -301,23 +190,11 @@ function getTeamByCard(
         .toUpperCase();
 
 
-    const rowClass =
-      String(row[5] || "")
-        .trim();
-
-
     if (
-      card === libraryCard &&
-      rowClass === classId
+      card === libraryCard
     ) {
 
       return {
-
-        classId:
-          classId,
-
-        className:
-          CLASS_NAMES[classId],
 
         libraryCard:
           card,
@@ -347,15 +224,11 @@ function getTeamByCard(
 // ======================================================
 
 function registerTeam(
-  classId,
   libraryCard,
   teamName,
   member1Id,
   member2Id
 ) {
-
-  classId =
-    assertValidClass_(classId);
 
 
   libraryCard =
@@ -401,53 +274,9 @@ function registerTeam(
   }
 
 
-  if (
-    Array.from(teamName).length > 5
-  ) {
-
-    throw new Error(
-      "小隊名稱最多 5 個字"
-    );
-
+  if (!member1Id || !member2Id) {
+    throw new Error("請輸入兩位隊員的姓名或編號");
   }
-
-
-  if (
-    !/^[0-9]{5}$/.test(
-      member1Id
-    )
-  ) {
-
-    throw new Error(
-      "隊員一學號格式不正確"
-    );
-
-  }
-
-
-  if (
-    !/^[0-9]{5}$/.test(
-      member2Id
-    )
-  ) {
-
-    throw new Error(
-      "隊員二學號格式不正確"
-    );
-
-  }
-
-
-  if (
-    member1Id === member2Id
-  ) {
-
-    throw new Error(
-      "兩位隊員學號不能相同"
-    );
-
-  }
-
 
   const sheet =
     getTeamsSheet();
@@ -474,7 +303,7 @@ function registerTeam(
             2,
             1,
             lastRow - 1,
-            6
+            5
           )
           .getDisplayValues();
 
@@ -491,16 +320,10 @@ function registerTeam(
             .toUpperCase();
 
 
-        const existingClass =
-          String(values[i][5] || "")
-            .trim();
-
-
-        // 同一班、同一張卡
+        // 同一張卡
         // → 更新原本小隊
         if (
-          existingCard === libraryCard &&
-          existingClass === classId
+          existingCard === libraryCard
         ) {
 
           const row =
@@ -512,15 +335,14 @@ function registerTeam(
               row,
               1,
               1,
-              6
+              5
             )
             .setValues([[
               libraryCard,
               teamName,
               member1Id,
               member2Id,
-              new Date(),
-              classId
+              new Date()
             ]]);
 
 
@@ -529,12 +351,6 @@ function registerTeam(
             success: true,
 
             updated: true,
-
-            classId:
-              classId,
-
-            className:
-              CLASS_NAMES[classId],
 
             libraryCard:
               libraryCard,
@@ -566,15 +382,14 @@ function registerTeam(
         row,
         1,
         1,
-        6
+        5
       )
       .setValues([[
         libraryCard,
         teamName,
         member1Id,
         member2Id,
-        new Date(),
-        classId
+        new Date()
       ]]);
 
 
@@ -583,12 +398,6 @@ function registerTeam(
       success: true,
 
       updated: false,
-
-      classId:
-        classId,
-
-      className:
-        CLASS_NAMES[classId],
 
       libraryCard:
         libraryCard,
@@ -962,7 +771,7 @@ function findTreasureBook(bookBarcode) {
 // 學生成功刷書後儲存紀錄
 // ======================================================
 
-function saveBorrowRecord(classId,studentId,bookBarcode) {
+function saveBorrowRecord(studentId,bookBarcode) {
 
   studentId = String(studentId || "").trim().toUpperCase();
 
@@ -989,8 +798,7 @@ function saveBorrowRecord(classId,studentId,bookBarcode) {
 
 
   // 尋找有沒有這個小隊
-  classId = assertValidClass_(classId);
-  const team = getTeamByCard(classId, studentId);
+  const team = getTeamByCard(studentId);
 
   if (!team) {
 
@@ -1038,10 +846,7 @@ function saveBorrowRecord(classId,studentId,bookBarcode) {
       .getActiveSpreadsheet();
 
 
-  const sheet =
-    spreadsheet.getSheetByName(
-      "BorrowRecords"
-    );
+  const sheet = getBorrowRecordsSheet();
 
 
   if (!sheet) {
@@ -1223,14 +1028,13 @@ function saveBorrowRecord(classId,studentId,bookBarcode) {
           row,
           1,
           1,
-          5
+          4
         )
         .setValues([[
           studentId,
           bookBarcode,
           new Date(),
-          "尋寶成功",
-          classId
+          "尋寶成功"
         ]]);
 
 
@@ -1308,12 +1112,8 @@ function saveBorrowRecord(classId,studentId,bookBarcode) {
 // 取得學生目前進度的 function
 // ======================================================
 function getStudentProgress(
-  classId,
   studentId
 ) {
-
-  classId =
-    assertValidClass_(classId);
 
 
   studentId =
@@ -1324,7 +1124,6 @@ function getStudentProgress(
 
   const team =
     getTeamByCard(
-      classId,
       studentId
     );
 
@@ -1334,12 +1133,6 @@ function getStudentProgress(
     return {
 
       registered: false,
-
-      classId:
-        classId,
-
-      className:
-        CLASS_NAMES[classId],
 
       foundCount: 0,
 
@@ -1381,7 +1174,7 @@ function getStudentProgress(
           2,
           1,
           lastRow - 1,
-          5
+          4
         )
         .getDisplayValues();
 
@@ -1400,13 +1193,7 @@ function getStudentProgress(
         );
 
 
-      const recordClass =
-        String(row[4] || "")
-          .trim();
-
-
       if (
-        recordClass === classId &&
         card === studentId &&
         treasureSet.has(barcode)
       ) {
@@ -1432,12 +1219,6 @@ function getStudentProgress(
   return {
 
     registered: true,
-
-    classId:
-      classId,
-
-    className:
-      CLASS_NAMES[classId],
 
     teamName:
       team.teamName,
@@ -1467,10 +1248,7 @@ function getStudentProgress(
 // 排行榜後端
 // ======================================================
 
-function getLeaderboardData(classId) {
-
-  classId =
-    assertValidClass_(classId);
+function getLeaderboardData() {
 
 
   const spreadsheet =
@@ -1481,10 +1259,7 @@ function getLeaderboardData(classId) {
     getTeamsSheet();
 
 
-  const recordsSheet =
-    spreadsheet.getSheetByName(
-      "BorrowRecords"
-    );
+  const recordsSheet = getBorrowRecordsSheet();
 
 
   if (!recordsSheet) {
@@ -1516,7 +1291,6 @@ function getLeaderboardData(classId) {
 
 
   // ==========================================
-  // 讀取目前班級的所有已註冊小隊
   // ==========================================
 
   const teams = [];
@@ -1534,7 +1308,7 @@ function getLeaderboardData(classId) {
           2,
           1,
           teamsLastRow - 1,
-          6
+          5
         )
         .getDisplayValues();
 
@@ -1568,21 +1342,15 @@ function getLeaderboardData(classId) {
             .trim();
 
 
-        // F：班級
-        const rowClass =
-          String(row[5] || "")
-            .trim();
 
 
 
         // ======================================
-        // 只把目前班級的小隊加入排行榜
         // ======================================
 
         if (
           libraryCard &&
-          teamName &&
-          rowClass === classId
+          teamName
         ) {
 
           teams.push({
@@ -1655,7 +1423,7 @@ function getLeaderboardData(classId) {
           2,
           1,
           recordLastRow - 1,
-          5
+          4
         )
         .getDisplayValues();
 
@@ -1678,10 +1446,6 @@ function getLeaderboardData(classId) {
           );
 
 
-        // E：班級
-        const recordClass =
-          String(row[4] || "")
-            .trim();
 
 
         const team =
@@ -1694,14 +1458,12 @@ function getLeaderboardData(classId) {
         // ======================================
         // 必須同時符合：
         //
-        // 1. 是目前班級已註冊的小隊
-        // 2. 紀錄也是目前班級
-        // 3. 書是目前候選書之一
+        // 1. 借書證屬於已註冊小隊
+        // 2. 書是目前候選書之一
         // ======================================
 
         if (
           team &&
-          recordClass === classId &&
           treasureSet.has(
             barcode
           )
@@ -1787,7 +1549,7 @@ function getLeaderboardData(classId) {
   // 10本 → 第1
   // 8本  → 第2
   // 8本  → 第2
-  // 6本  → 第4
+  // 5本  → 第4
   // ==========================================
 
   let previousCount =
@@ -1840,12 +1602,6 @@ function getLeaderboardData(classId) {
 
   return {
 
-    classId:
-      classId,
-
-    className:
-      CLASS_NAMES[classId],
-
     teams:
       teams,
 
@@ -1884,53 +1640,17 @@ function getWebAppUrl() {
 
 
 // ======================================================
-// BorrowRecords 增加 class_id 的 helper
 // ======================================================
 
 function getBorrowRecordsSheet() {
-
-  const spreadsheet =
-    SpreadsheetApp.getActiveSpreadsheet();
-
-
-  const sheet =
-    spreadsheet.getSheetByName(
-      "BorrowRecords"
-    );
-
-
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = spreadsheet.getSheetByName("DemoBorrowRecords");
   if (!sheet) {
-
-    throw new Error(
-      "找不到 BorrowRecords 工作表"
-    );
-
+    sheet = spreadsheet.insertSheet("DemoBorrowRecords");
+    sheet.getRange(1, 1, 1, 4).setValues([[
+      "library_card", "barcode", "found_at", "status"
+    ]]);
   }
-
-
-  if (
-    sheet.getRange(1, 5).getValue() === ""
-  ) {
-
-    sheet
-      .getRange(1, 5)
-      .setValue("class_id");
-
-  }
-
-
-  sheet
-    .getRange("A:B")
-    .setNumberFormat("@");
-
-
-  sheet
-    .getRange("E:E")
-    .setNumberFormat("@");
-
-
+  sheet.getRange("A:B").setNumberFormat("@");
   return sheet;
-
 }
-
-

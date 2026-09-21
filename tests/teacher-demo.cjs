@@ -1,0 +1,155 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const path = require('node:path');
+const root = path.join(__dirname, '..');
+const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+
+class Sheet {
+  constructor(rows = []) { this.rows = rows; }
+  getLastRow() { return this.rows.length; }
+  getRange(row, col, height = 1, width = 1) {
+    const sheet = this;
+    return {
+      setNumberFormat() { return this; },
+      setValues(values) {
+        assert.equal(values.length, height, 'write height');
+        values.forEach((cells, i) => {
+          assert.equal(cells.length, width, 'write width');
+          sheet.rows[row - 1 + i] ||= [];
+          cells.forEach((value, j) => sheet.rows[row - 1 + i][col - 1 + j] = value);
+        });
+        return this;
+      },
+      setValue(value) { return this.setValues([[value]]); },
+      getDisplayValues() {
+        return Array.from({length: height}, (_, i) =>
+          Array.from({length: width}, (_, j) => String(sheet.rows[row - 1 + i]?.[col - 1 + j] ?? '')));
+      },
+      getValue() { return sheet.rows[row - 1]?.[col - 1] ?? ''; }
+    };
+  }
+  deleteRow(row) { this.rows.splice(row - 1, 1); }
+}
+const sheets = new Map([
+  ['Teams', new Sheet([['student data']])],
+  ['BorrowRecords', new Sheet([['student records']])]
+]);
+const studentSnapshot = JSON.stringify([...sheets]);
+const spreadsheet = {
+  getSheetByName: name => sheets.get(name),
+  insertSheet(name) { const sheet = new Sheet(); sheets.set(name, sheet); return sheet; },
+  getSpreadsheetTimeZone: () => 'Asia/Taipei'
+};
+let locked = false;
+const backend = vm.createContext({
+  SpreadsheetApp: {getActiveSpreadsheet: () => spreadsheet},
+  LockService: {getScriptLock: () => ({
+    waitLock() { assert.equal(locked, false); locked = true; },
+    releaseLock() { locked = false; }
+  })},
+  Utilities: {formatDate: () => '12:00:00'},
+  ScriptApp: {getService: () => ({getUrl: () => 'https://example.test/exec'})},
+  HtmlService: {createHtmlOutputFromFile: file => ({file, setTitle() { return this; }})}
+});
+vm.runInContext(read('Backend.gs'), backend);
+assert.equal(backend.getLeaderboardData().teamCount, 0);
+assert.equal(backend.getStudentProgress('A100000001').registered, false);
+const longName = '老師一起來圖書館找寶藏'.repeat(10);
+const card = 'A100000001';
+assert.equal(backend.registerTeam(card, longName, '王小明', '007').success, true);
+assert.equal(backend.getTeamByCard(card).teamName, longName);
+assert.equal(backend.getTeamByCard(card).member2Id, '007');
+assert.equal(backend.registerTeam(card, longName, '同名老師', '同名老師').updated, true);
+assert.equal(sheets.get('DemoTeams').getLastRow(), 2);
+assert.throws(() => backend.registerTeam(card, '', '王', '陳'));
+assert.throws(() => backend.registerTeam(card, '小隊', '', '陳'));
+assert.throws(() => backend.saveBorrowRecord('A100000099', '001'));
+for (let n = 1; n <= 11; n++) backend.addTreasureBook(String(n).padStart(3, '0'));
+assert.throws(() => backend.saveBorrowRecord(card, '999'));
+assert.equal(backend.saveBorrowRecord(card, '００１').foundCount, 1);
+assert.equal(backend.saveBorrowRecord(card, '001').isDuplicate, true);
+assert.equal(sheets.get('DemoBorrowRecords').getLastRow(), 2);
+for (let n = 2; n <= 10; n++) backend.saveBorrowRecord(card, String(n).padStart(3, '0'));
+assert.equal(backend.getStudentProgress(card).completed, true);
+assert.equal(backend.saveBorrowRecord(card, '011').alreadyCompleted, true);
+assert.equal(sheets.get('DemoBorrowRecords').getLastRow(), 11);
+backend.registerTeam('A100000002', '第二隊', '中文姓名', '123456789');
+backend.registerTeam('A100000003', '<script>第三隊</script>', '老師甲', '老師乙');
+backend.saveBorrowRecord('A100000002', '001');
+backend.saveBorrowRecord('A100000003', '001');
+assert.equal(backend.getStudentProgress('A100000002').foundCount, 1);
+const rankings = backend.getLeaderboardData();
+assert.deepEqual(Array.from(rankings.teams, team => team.rank), [1, 2, 2]);
+assert.deepEqual(Array.from(rankings.teams, team => team.foundCount), [10, 1, 1]);
+assert.equal(JSON.stringify([...sheets].filter(([name]) => ['Teams', 'BorrowRecords'].includes(name))), studentSnapshot);
+assert.equal(backend.doGet({parameter: {page: 'register'}}).file, 'Register');
+assert.equal(backend.doGet({parameter: {page: 'leaderboard'}}).file, 'Leaderboard');
+assert.equal(backend.doGet({parameter: {}}).file, 'Index');
+console.log('PASS: registration, Unicode names, arbitrary IDs, updates, isolated storage, scan scoring and rankings');
+
+function page(file, parameters = {}) {
+  const elements = new Map();
+  const calls = [];
+  const timers = [];
+  const opened = [];
+  const element = () => ({value: '', innerHTML: '', textContent: '', disabled: false,
+    focus() {}, select() {}, addEventListener() {}});
+  const run = new Proxy({}, {get(_, method) {
+    if (method === 'withSuccessHandler') return fn => { run.success = fn; return run; };
+    if (method === 'withFailureHandler') return fn => { run.failure = fn; return run; };
+    if (method === 'success' || method === 'failure') return _[method];
+    return (...args) => {
+      calls.push({method, args});
+      assert.equal(typeof backend[method], 'function', 'known backend method ' + method);
+      let result;
+      try { result = backend[method](...args); }
+      catch (error) { if (run.failure) return run.failure(error); throw error; }
+      if (run.success) run.success(result);
+    };
+  }});
+  const context = vm.createContext({
+    document: {
+      getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); },
+      createElement() { return {set textContent(value) {
+        this.innerHTML = String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }}; }
+    },
+    window: {open: (...args) => opened.push(args)},
+    google: {script: {run, url: {getLocation: fn => fn({parameter: parameters})}}},
+    setInterval: (fn, ms) => timers.push({fn, ms})
+  });
+  const html = read(file);
+  assert.doesNotMatch(html, /currentClassId|getClassInfo|parameter\.class/);
+  vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], context);
+  context.window.onload();
+  return {context, elements, calls, timers, opened};
+}
+const registration = page('Register.html');
+assert.doesNotMatch(read('Register.html'), /maxlength|inputmode="numeric"/);
+registration.elements.get('libraryCard').value = 'A100000004';
+registration.elements.get('teamName').value = longName;
+registration.elements.get('member1').value = '黃老師';
+registration.elements.get('member2').value = '12';
+registration.context.submitRegistration();
+assert.equal(registration.calls[0].args.length, 4);
+assert.equal(registration.opened[0][0], 'https://example.test/exec?registered=A100000004');
+const scan = page('Index.html', {registered: 'A100000004'});
+scan.context.processScan('001');
+assert.equal(scan.calls.filter(call => call.method === 'saveBorrowRecord').length, 0);
+scan.context.processScan('A100000004');
+scan.context.processScan('001');
+assert.equal(backend.getStudentProgress('A100000004').foundCount, 1);
+assert.equal(scan.calls.find(call => call.method === 'saveBorrowRecord').args.length, 2);
+const directScan = page('Index.html');
+directScan.context.processScan('A100000004');
+assert.equal(directScan.calls[0].method, 'getStudentProgress');
+const board = page('Leaderboard.html');
+assert.equal(board.calls[0].args.length, 0);
+assert.equal(board.timers[0].ms, 5000);
+assert.ok(board.elements.get('board').innerHTML.includes('&lt;script&gt;'));
+assert.ok(board.elements.get('board').innerHTML.includes('黃老師'));
+board.timers[0].fn();
+assert.equal(board.calls.length, 2);
+for (const file of ['Admin.html']) new vm.Script(read(file).match(/<script>([\s\S]*?)<\/script>/)[1]);
+console.log('PASS: class-free registration redirect, required card scan, direct scan page, leaderboard refresh and escaped names');

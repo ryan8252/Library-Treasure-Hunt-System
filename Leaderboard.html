@@ -11,7 +11,7 @@
   content="width=device-width, initial-scale=1.0"
 >
 
-<title>圖書館尋寶排行榜</title>
+<title>老師尋寶排行榜</title>
 
 
 <style>
@@ -164,6 +164,9 @@ body {
 
 .team-name {
 
+  min-width: 0;
+  overflow-wrap: anywhere;
+
   font-size: 23px;
 
   font-weight: bold;
@@ -172,6 +175,9 @@ body {
 
 
 .members {
+
+  min-width: 0;
+  overflow-wrap: anywhere;
 
   font-size: 19px;
 
@@ -343,7 +349,7 @@ body {
 
 <div class="header">
 
-  🏆 圖書館尋寶排行榜
+  🏆 老師尋寶排行榜
 
 </div>
 
@@ -421,7 +427,7 @@ const updateInfo =
 
 
 let loading = false;
-let currentClassId = "";
+
 
 
 
@@ -434,7 +440,7 @@ function loadLeaderboard() {
 
   // 防止前一個請求還沒完成
   // 下一個又送出去
-  if (loading || !currentClassId) {
+  if (loading) {
 
     return;
 
@@ -490,7 +496,7 @@ function loadLeaderboard() {
     )
 
 
-    .getLeaderboardData(currentClassId);
+    .getLeaderboardData();
 
 }
 
@@ -749,42 +755,14 @@ function escapeHtml(
 // ==========================================
 
 window.onload = function() {
-  google.script.url.getLocation(function(location) {
-    const classId = String(location.parameter.class || "").trim();
-
-    function showClassError(message) {
-      board.innerHTML =
-        '<div class="error">✗ ' + escapeHtml(message) + '</div>';
-      updateInfo.textContent = "排行榜尚未載入";
-    }
-
-    if (!classId) {
-      showClassError("網址沒有指定班級，請使用含有 class 參數的班級網址。");
-      return;
-    }
-
-    google.script.run
-      .withSuccessHandler(function(info) {
-        if (!info.valid) {
-          showClassError("班級代碼不正確");
-          return;
-        }
-
-        currentClassId = info.classId;
-        loadLeaderboard();
-        setInterval(loadLeaderboard, 5000);
-      })
-      .withFailureHandler(function(error) {
-        showClassError("班級讀取失敗：" + error.message);
-      })
-      .getClassInfo(classId);
-  });
+  loadLeaderboard();
+  setInterval(loadLeaderboard, 5000);
 };
 
 
 
 // ==========================================
-// 自動更新在班級驗證成功後啟動
+// 每 5 秒更新老師小隊的排行榜
 // ==========================================
 
 
