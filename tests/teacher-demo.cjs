@@ -88,13 +88,14 @@ assert.equal(backend.doGet({parameter: {page: 'leaderboard'}}).file, 'Leaderboar
 assert.equal(backend.doGet({parameter: {}}).file, 'Index');
 console.log('PASS: registration, Unicode names, arbitrary IDs, updates, isolated storage, scan scoring and rankings');
 
-function page(file, parameters = {}) {
+function page(file, parameters = {}, deferred = false) {
   const elements = new Map();
   const calls = [];
   const timers = [];
   const opened = [];
+  const pending = [];
   const element = () => ({value: '', innerHTML: '', textContent: '', disabled: false,
-    focus() {}, select() {}, addEventListener() {}});
+    focus() { this.focused = true; }, select() {}, addEventListener() {}});
   const run = new Proxy({}, {get(_, method) {
     if (method === 'withSuccessHandler') return fn => { run.success = fn; return run; };
     if (method === 'withFailureHandler') return fn => { run.failure = fn; return run; };
@@ -102,10 +103,15 @@ function page(file, parameters = {}) {
     return (...args) => {
       calls.push({method, args});
       assert.equal(typeof backend[method], 'function', 'known backend method ' + method);
-      let result;
-      try { result = backend[method](...args); }
-      catch (error) { if (run.failure) return run.failure(error); throw error; }
-      if (run.success) run.success(result);
+      const success = run.success, failure = run.failure;
+      const respond = () => {
+        let result;
+        try { result = backend[method](...args); }
+        catch (error) { if (failure) return failure(error); throw error; }
+        if (success) success(result);
+      };
+      if (deferred) pending.push(respond);
+      else respond();
     };
   }});
   const context = vm.createContext({
@@ -123,7 +129,7 @@ function page(file, parameters = {}) {
   assert.doesNotMatch(html, /currentClassId|getClassInfo|parameter\.class/);
   vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], context);
   context.window.onload();
-  return {context, elements, calls, timers, opened};
+  return {context, elements, calls, timers, opened, pending};
 }
 const registration = page('Register.html');
 assert.doesNotMatch(read('Register.html'), /maxlength|inputmode="numeric"/);
@@ -141,6 +147,41 @@ scan.context.processScan('A100000004');
 scan.context.processScan('001');
 assert.equal(backend.getStudentProgress('A100000004').foundCount, 1);
 assert.equal(scan.calls.find(call => call.method === 'saveBorrowRecord').args.length, 2);
+function assertCardConsumed(view) {
+  assert.equal(view.elements.get('studentId').value, '');
+  assert.equal(view.elements.get('studentId').disabled, false);
+  assert.equal(view.elements.get('studentId').focused, true);
+  assert.equal(view.elements.get('bookBarcode').value, '');
+  const count = view.calls.length;
+  view.context.processScan('002');
+  assert.equal(view.calls.length, count, 'another book must require a new card scan');
+}
+assertCardConsumed(scan);
+for (const barcode of ['001', '999', '002']) {
+  scan.context.processScan('A100000004');
+  scan.context.processScan(barcode);
+  assertCardConsumed(scan); // duplicate, rejected, and successful books
+}
+assert.equal(backend.getStudentProgress('A100000004').foundCount, 2);
+const completedScan = page('Index.html');
+completedScan.context.processScan(card);
+completedScan.context.processScan('001');
+assertCardConsumed(completedScan);
+const slowScan = page('Index.html', {}, true);
+slowScan.context.processScan('A100000004');
+slowScan.context.processScan('A100000004');
+slowScan.context.processScan('003');
+assert.equal(slowScan.pending.length, 1, 'do not overlap card verification');
+slowScan.pending.shift()();
+slowScan.context.processScan('003');
+assert.equal(slowScan.elements.get('studentId').value, '');
+assert.equal(slowScan.elements.get('studentId').disabled, true);
+slowScan.context.processScan('A100000004');
+slowScan.context.processScan('004');
+assert.equal(slowScan.pending.length, 1, 'do not scan while a book is saving');
+slowScan.pending.shift()();
+assertCardConsumed(slowScan);
+console.log('PASS: each book consumes card verification, including duplicate/error/completed results and delayed responses');
 const directScan = page('Index.html');
 directScan.context.processScan('A100000004');
 assert.equal(directScan.calls[0].method, 'getStudentProgress');
