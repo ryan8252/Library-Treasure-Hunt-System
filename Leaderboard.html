@@ -372,7 +372,7 @@ body {
       class="update-info"
     >
 
-      排行榜每 5 秒自動更新
+      排行榜每 2 秒自動更新
 
     </div>
 
@@ -419,6 +419,8 @@ const updateInfo =
     "updateInfo"
   );
 
+
+const LEADERBOARD_REFRESH_MS = 2000;
 
 let loading = false;
 let currentClassId = "";
@@ -515,7 +517,7 @@ function renderLeaderboard(
 
     data.updatedAt +
 
-    "　｜　每 5 秒自動更新";
+    "　｜　每 " + (LEADERBOARD_REFRESH_MS / 1000) + " 秒自動更新";
 
 
 
@@ -772,7 +774,7 @@ window.onload = function() {
 
         currentClassId = info.classId;
         loadLeaderboard();
-        setInterval(loadLeaderboard, 5000);
+        setInterval(loadLeaderboard, LEADERBOARD_REFRESH_MS);
       })
       .withFailureHandler(function(error) {
         showClassError("班級讀取失敗：" + error.message);

@@ -183,170 +183,27 @@ function normalizeBarcode_(value) {
 // ======================================================
 
 function getTeamsSheet() {
-
-  const spreadsheet =
-    SpreadsheetApp.getActiveSpreadsheet();
-
-
-  let sheet =
-    spreadsheet.getSheetByName(
-      "Teams"
-    );
-
-
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = spreadsheet.getSheetByName("Teams");
   if (!sheet) {
-
-    sheet =
-      spreadsheet.insertSheet(
-        "Teams"
-      );
-
-
-    sheet
-      .getRange(1, 1, 1, 6)
-      .setValues([[
-        "library_card",
-        "team_name",
-        "member1_id",
-        "member2_id",
-        "registered_at",
-        "class_id"
-      ]]);
-
+    sheet = spreadsheet.insertSheet("Teams");
+    sheet.getRange(1, 1, 1, 6).setValues([[
+      "library_card", "team_name", "member1_id", "member2_id", "registered_at", "class_id"
+    ]]);
+    sheet.getRange("A:D").setNumberFormat("@");
+    sheet.getRange("F:F").setNumberFormat("@");
+  } else if (sheet.getRange(1, 6).getValue() === "") {
+    sheet.getRange(1, 6).setValue("class_id");
   }
-
-
-  // 舊版 Teams 自動補 class_id
-  if (
-    sheet.getRange(1, 6).getValue() === ""
-  ) {
-
-    sheet
-      .getRange(1, 6)
-      .setValue("class_id");
-
-  }
-
-
-  sheet
-    .getRange("A:A")
-    .setNumberFormat("@");
-
-
-  sheet
-    .getRange("C:D")
-    .setNumberFormat("@");
-
-
-  sheet
-    .getRange("F:F")
-    .setNumberFormat("@");
-
-
   return sheet;
-
 }
 
-
-// ======================================================
-// 用借書證尋找小隊
-// ======================================================
-
-function getTeamByCard(
-  classId,
-  libraryCard
-) {
-
-  classId =
-    assertValidClass_(classId);
-
-
-  libraryCard =
-    String(libraryCard || "")
-      .trim()
-      .toUpperCase();
-
-
-  const sheet =
-    getTeamsSheet();
-
-
-  const lastRow =
-    sheet.getLastRow();
-
-
-  if (lastRow < 2) {
-
-    return null;
-
-  }
-
-
-  const values =
-    sheet
-      .getRange(
-        2,
-        1,
-        lastRow - 1,
-        6
-      )
-      .getDisplayValues();
-
-
-  for (const row of values) {
-
-    const card =
-      String(row[0] || "")
-        .trim()
-        .toUpperCase();
-
-
-    const rowClass =
-      String(row[5] || "")
-        .trim();
-
-
-    if (
-      card === libraryCard &&
-      rowClass === classId
-    ) {
-
-      return {
-
-        classId:
-          classId,
-
-        className:
-          CLASS_NAMES[classId],
-
-        libraryCard:
-          card,
-
-        teamName:
-          row[1],
-
-        member1Id:
-          row[2],
-
-        member2Id:
-          row[3]
-
-      };
-
-    }
-
-  }
-
-
-  return null;
-
+function getTeamByCard(classId, libraryCard) {
+  classId = assertValidClass_(classId);
+  return findTeam_(getStudentState_(), classId, libraryCard);
 }
 
-// ======================================================
-// 註冊小隊
-// ======================================================
-
-function registerTeam(
+function registerTeamUncached_(
   classId,
   libraryCard,
   teamName,
@@ -453,14 +310,7 @@ function registerTeam(
     getTeamsSheet();
 
 
-  const lock =
-    LockService.getScriptLock();
-
-
-  lock.waitLock(10000);
-
-
-  try {
+  {
 
     const lastRow =
       sheet.getLastRow();
@@ -505,6 +355,12 @@ function registerTeam(
 
           const row =
             i + 2;
+
+
+          sheet.getRange(row, 1, 1, 4).setNumberFormat("@");
+
+
+          sheet.getRange(row, 6).setNumberFormat("@");
 
 
           sheet
@@ -561,6 +417,12 @@ function registerTeam(
       sheet.getLastRow() + 1;
 
 
+    sheet.getRange(row, 1, 1, 4).setNumberFormat("@");
+
+
+    sheet.getRange(row, 6).setNumberFormat("@");
+
+
     sheet
       .getRange(
         row,
@@ -605,10 +467,6 @@ function registerTeam(
     };
 
 
-  } finally {
-
-    lock.releaseLock();
-
   }
 
 }
@@ -617,6 +475,7 @@ function registerTeam(
 // ======================================================
 // 取得尋寶書籍工作表
 // ======================================================
+
 
 function getTreasureBooksSheet() {
 
@@ -763,7 +622,7 @@ function getTreasureBooks() {
 // 新增一本指定書
 // ======================================================
 
-function addTreasureBook(barcode) {
+function addTreasureBookUncached_(barcode) {
 
   barcode =
     normalizeBarcode_(barcode);
@@ -788,14 +647,7 @@ function addTreasureBook(barcode) {
   }
 
 
-  const lock =
-    LockService.getScriptLock();
-
-
-  lock.waitLock(10000);
-
-
-  try {
+  {
 
     const books =
       getTreasureBooks();
@@ -851,10 +703,6 @@ function addTreasureBook(barcode) {
     };
 
 
-  } finally {
-
-    lock.releaseLock();
-
   }
 
 }
@@ -865,7 +713,8 @@ function addTreasureBook(barcode) {
 // 刪除一本指定書
 // ======================================================
 
-function deleteTreasureBook(barcode) {
+
+function deleteTreasureBookUncached_(barcode) {
 
   barcode =
     normalizeBarcode_(barcode);
@@ -962,917 +811,87 @@ function findTreasureBook(bookBarcode) {
 // 學生成功刷書後儲存紀錄
 // ======================================================
 
-function saveBorrowRecord(classId,studentId,bookBarcode) {
-
-  studentId = String(studentId || "").trim().toUpperCase();
-
-
-  bookBarcode = normalizeBarcode_(bookBarcode);
-
-
-  if (!studentId) {
-
-    throw new Error(
-      "讀者證號不能為空"
-    );
-
-  }
-
-
-  if (!bookBarcode) {
-
-    throw new Error(
-      "書籍條碼不能為空"
-    );
-
-  }
-
-
-  // 尋找有沒有這個小隊
+function saveBorrowRecord(classId, studentId, bookBarcode) {
   classId = assertValidClass_(classId);
-  const team = getTeamByCard(classId, studentId);
-
-  if (!team) {
-
-    throw new Error(
-      "這張借書證尚未完成小隊註冊"
-    );
-
-  }
-
-
-  // ======================================
-  // 取得所有候選書
-  // 最多可以有 100 本
-  // ======================================
-
-  const treasureBooks =
-    getTreasureBooks();
-
-
-  const requiredCount =
-    REQUIRED_BOOKS_PER_STUDENT;
-
-
-
-  // ======================================
-  // 掃到的書必須在候選書庫內
-  // ======================================
-
-  if (
-    !treasureBooks.includes(
-      bookBarcode
-    )
-  ) {
-
-    throw new Error(
-      "這不是本次尋寶活動指定的書籍"
-    );
-
-  }
-
-
-
-  const spreadsheet =
-    SpreadsheetApp
-      .getActiveSpreadsheet();
-
-
-  const sheet =
-    spreadsheet.getSheetByName(
-      "BorrowRecords"
-    );
-
-
-  if (!sheet) {
-
-    throw new Error(
-      "找不到 BorrowRecords 工作表"
-    );
-
-  }
-
-
-
-  const lock =
-    LockService.getScriptLock();
-
-
+  studentId = String(studentId || "").trim().toUpperCase();
+  bookBarcode = normalizeBarcode_(bookBarcode);
+  if (!studentId) throw new Error("讀者證號不能為空");
+  if (!bookBarcode) throw new Error("書籍條碼不能為空");
+  const lock = LockService.getScriptLock();
   lock.waitLock(10000);
-
-
   try {
-
-
-    // ======================================
-    // 找出這個學生以前找到過的書
-    // ======================================
-
-    const foundBooks =
-      new Set();
-
-
-    const lastRow =
-      sheet.getLastRow();
-
-
-    if (lastRow >= 2) {
-
-      const records =
-        sheet
-          .getRange(
-            2,
-            1,
-            lastRow - 1,
-            2
-          )
-          .getDisplayValues();
-
-
-      records.forEach(
-        function(row) {
-
-
-          const recordStudent =
-            String(row[0] || "")
-              .trim()
-              .toUpperCase();
-
-
-          const recordBook =
-            normalizeBarcode_(
-              row[1]
-            );
-
-
-          if (
-            recordStudent === studentId &&
-            treasureBooks.includes(
-              recordBook
-            )
-          ) {
-
-            foundBooks.add(
-              recordBook
-            );
-
-          }
-
-        }
-      );
-
+    // Lock covers snapshot loading, duplicate checks, persistence and cache update.
+    const state = readStudentStateLocked_();
+    const team = findTeam_(state, classId, studentId);
+    if (!team) throw new Error("這張借書證尚未完成小隊註冊");
+    if (!state.books.includes(bookBarcode)) {
+      throw new Error("這不是本次尋寶活動指定的書籍");
     }
-
-
-
-    // ======================================
-    // 如果這個學生早就完成 10 本
-    // 就不要再增加紀錄
-    // ======================================
-
-    if (
-      foundBooks.size >=
-      requiredCount
-    ) {
-
-      return {
-
-        success: true,
-
-        studentId:
-          studentId,
-
-        teamName:
-          team.teamName,
-
-        member1Id:
-          team.member1Id,
-
-        member2Id:
-          team.member2Id,
-
-        bookBarcode:
-          bookBarcode,
-
-        isDuplicate:
-          foundBooks.has(
-            bookBarcode
-          ),
-
-        alreadyCompleted:
-          true,
-
-        foundCount:
-          requiredCount,
-
-        totalCount:
-          requiredCount,
-
-        completed:
-          true
-
-      };
-
+    const found = foundBooks_(state, classId, studentId);
+    const isDuplicate = found.has(bookBarcode);
+    const alreadyCompleted = found.size >= REQUIRED_BOOKS_PER_STUDENT;
+    if (!isDuplicate && !alreadyCompleted) {
+      // Remove the old snapshot before writing so a failed write cannot leave stale data.
+      CacheService.getScriptCache().remove(STUDENT_CACHE_KEY);
+      // Snapshot loading already checked the schema; avoid rereading the header for each scan.
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("BorrowRecords");
+      if (!sheet) throw new Error("找不到 BorrowRecords 工作表");
+      const row = sheet.getLastRow() + 1;
+      sheet.getRange(row, 1, 1, 2).setNumberFormat("@");
+      sheet.getRange(row, 5).setNumberFormat("@");
+      sheet.getRange(row, 1, 1, 5).setValues([[
+        studentId, bookBarcode, new Date(), "尋寶成功", classId
+      ]]);
+      SpreadsheetApp.flush();
+      state.records.push([studentId, bookBarcode, classId]);
+      putStudentState_(state);
+      found.add(bookBarcode);
     }
-
-
-
-    // ======================================
-    // 判斷是不是重複的書
-    // ======================================
-
-    const isDuplicate =
-      foundBooks.has(
-        bookBarcode
-      );
-
-
-
-    // ======================================
-    // 沒找過才新增
-    // ======================================
-
-    if (!isDuplicate) {
-
-
-      const row =
-        sheet.getLastRow() + 1;
-
-
-      sheet
-        .getRange(row, 1)
-        .setNumberFormat("@")
-        .setValue(studentId);
-
-
-      sheet
-        .getRange(row, 2)
-        .setNumberFormat("@")
-        .setValue(bookBarcode);
-
-
-      sheet
-        .getRange(row, 3)
-        .setValue(
-          new Date()
-        );
-
-
-      sheet
-        .getRange(
-          row,
-          1,
-          1,
-          5
-        )
-        .setValues([[
-          studentId,
-          bookBarcode,
-          new Date(),
-          "尋寶成功",
-          classId
-        ]]);
-
-
-      foundBooks.add(
-        bookBarcode
-      );
-
-    }
-
-
-
-    // ======================================
-    // 最大只顯示到 10
-    // ======================================
-
-    const foundCount =
-      Math.min(
-        foundBooks.size,
-        requiredCount
-      );
-
-
-    const completed =
-      foundCount >=
-      requiredCount;
-
-
-
-    return {
-
-      success: true,
-
-      studentId:
-        studentId,
-
-      teamName:
-        team.teamName,
-
-      member1Id:
-        team.member1Id,
-
-      member2Id:
-        team.member2Id,
-
-      bookBarcode:
-        bookBarcode,
-
-      isDuplicate:
-        isDuplicate,
-
-      alreadyCompleted:
-        false,
-
-      foundCount:
-        foundCount,
-
-      totalCount:
-        requiredCount,
-
-      completed:
-        completed
-
-    };
-
-
-  } finally {
-
-    lock.releaseLock();
-
-  }
-
-}
-
-// ======================================================
-// 取得學生目前進度的 function
-// ======================================================
-function getStudentProgress(
-  classId,
-  studentId
-) {
-
-  classId =
-    assertValidClass_(classId);
-
-
-  studentId =
-    String(studentId || "")
-      .trim()
-      .toUpperCase();
-
-
-  const team =
-    getTeamByCard(
-      classId,
-      studentId
-    );
-
-
-  if (!team) {
-
-    return {
-
-      registered: false,
-
-      classId:
-        classId,
-
-      className:
-        CLASS_NAMES[classId],
-
-      foundCount: 0,
-
-      totalCount:
-        REQUIRED_BOOKS_PER_STUDENT,
-
-      completed: false
-
-    };
-
-  }
-
-
-  const treasureBooks =
-    getTreasureBooks();
-
-
-  const treasureSet =
-    new Set(treasureBooks);
-
-
-  const sheet =
-    getBorrowRecordsSheet();
-
-
-  const foundBooks =
-    new Set();
-
-
-  const lastRow =
-    sheet.getLastRow();
-
-
-  if (lastRow >= 2) {
-
-    const records =
-      sheet
-        .getRange(
-          2,
-          1,
-          lastRow - 1,
-          5
-        )
-        .getDisplayValues();
-
-
-    records.forEach(function(row) {
-
-      const card =
-        String(row[0] || "")
-          .trim()
-          .toUpperCase();
-
-
-      const barcode =
-        normalizeBarcode_(
-          row[1]
-        );
-
-
-      const recordClass =
-        String(row[4] || "")
-          .trim();
-
-
-      if (
-        recordClass === classId &&
-        card === studentId &&
-        treasureSet.has(barcode)
-      ) {
-
-        foundBooks.add(
-          barcode
-        );
-
-      }
-
+    return Object.assign(teamProgress_(team, found), {
+      success: true, studentId, bookBarcode, isDuplicate, alreadyCompleted
     });
-
+  } finally {
+    lock.releaseLock();
   }
-
-
-  const foundCount =
-    Math.min(
-      foundBooks.size,
-      REQUIRED_BOOKS_PER_STUDENT
-    );
-
-
-  return {
-
-    registered: true,
-
-    classId:
-      classId,
-
-    className:
-      CLASS_NAMES[classId],
-
-    teamName:
-      team.teamName,
-
-    member1Id:
-      team.member1Id,
-
-    member2Id:
-      team.member2Id,
-
-    foundCount:
-      foundCount,
-
-    totalCount:
-      REQUIRED_BOOKS_PER_STUDENT,
-
-    completed:
-      foundCount >=
-      REQUIRED_BOOKS_PER_STUDENT
-
-  };
-
 }
 
 
-// ======================================================
-// 排行榜後端
-// ======================================================
+function getStudentProgress(classId, studentId) {
+  classId = assertValidClass_(classId);
+  const state = getStudentState_();
+  const team = findTeam_(state, classId, studentId);
+  if (!team) return {registered: false, classId, className: CLASS_NAMES[classId],
+    foundCount: 0, totalCount: REQUIRED_BOOKS_PER_STUDENT, completed: false};
+  return teamProgress_(team, foundBooks_(state, classId, team.libraryCard));
+}
 
 function getLeaderboardData(classId) {
-
-  classId =
-    assertValidClass_(classId);
-
-
-  const spreadsheet =
-    SpreadsheetApp.getActiveSpreadsheet();
-
-
-  const teamsSheet =
-    getTeamsSheet();
-
-
-  const recordsSheet =
-    spreadsheet.getSheetByName(
-      "BorrowRecords"
-    );
-
-
-  if (!recordsSheet) {
-
-    throw new Error(
-      "找不到 BorrowRecords 工作表"
-    );
-
-  }
-
-
-  // ==========================================
-  // 目前活動所有有效候選書
-  // ==========================================
-
-  const treasureBooks =
-    getTreasureBooks();
-
-
-  const treasureSet =
-    new Set(
-      treasureBooks
-    );
-
-
-  const requiredCount =
-    REQUIRED_BOOKS_PER_STUDENT;
-
-
-
-  // ==========================================
-  // 讀取目前班級的所有已註冊小隊
-  // ==========================================
-
-  const teams = [];
-
-
-  const teamsLastRow =
-    teamsSheet.getLastRow();
-
-
-  if (teamsLastRow >= 2) {
-
-    const teamValues =
-      teamsSheet
-        .getRange(
-          2,
-          1,
-          teamsLastRow - 1,
-          6
-        )
-        .getDisplayValues();
-
-
-    teamValues.forEach(
-      function(row) {
-
-
-        // A：借書證
-        const libraryCard =
-          String(row[0] || "")
-            .trim()
-            .toUpperCase();
-
-
-        // B：小隊名稱
-        const teamName =
-          String(row[1] || "")
-            .trim();
-
-
-        // C：隊員一
-        const member1Id =
-          String(row[2] || "")
-            .trim();
-
-
-        // D：隊員二
-        const member2Id =
-          String(row[3] || "")
-            .trim();
-
-
-        // F：班級
-        const rowClass =
-          String(row[5] || "")
-            .trim();
-
-
-
-        // ======================================
-        // 只把目前班級的小隊加入排行榜
-        // ======================================
-
-        if (
-          libraryCard &&
-          teamName &&
-          rowClass === classId
-        ) {
-
-          teams.push({
-
-            libraryCard:
-              libraryCard,
-
-            teamName:
-              teamName,
-
-            member1Id:
-              member1Id,
-
-            member2Id:
-              member2Id,
-
-            foundBooks:
-              new Set(),
-
-            foundCount:
-              0
-
-          });
-
-        }
-
-      }
-    );
-
-  }
-
-
-
-  // ==========================================
-  // 建立快速查詢
-  //
-  // libraryCard → team
-  // ==========================================
-
-  const teamMap =
-    new Map();
-
-
-  teams.forEach(
-    function(team) {
-
-      teamMap.set(
-        team.libraryCard,
-        team
-      );
-
-    }
-  );
-
-
-
-  // ==========================================
-  // 讀取尋寶紀錄
-  // ==========================================
-
-  const recordLastRow =
-    recordsSheet.getLastRow();
-
-
-  if (recordLastRow >= 2) {
-
-    const records =
-      recordsSheet
-        .getRange(
-          2,
-          1,
-          recordLastRow - 1,
-          5
-        )
-        .getDisplayValues();
-
-
-    records.forEach(
-      function(row) {
-
-
-        // A：借書證
-        const libraryCard =
-          String(row[0] || "")
-            .trim()
-            .toUpperCase();
-
-
-        // B：書籍條碼
-        const barcode =
-          normalizeBarcode_(
-            row[1]
-          );
-
-
-        // E：班級
-        const recordClass =
-          String(row[4] || "")
-            .trim();
-
-
-        const team =
-          teamMap.get(
-            libraryCard
-          );
-
-
-
-        // ======================================
-        // 必須同時符合：
-        //
-        // 1. 是目前班級已註冊的小隊
-        // 2. 紀錄也是目前班級
-        // 3. 書是目前候選書之一
-        // ======================================
-
-        if (
-          team &&
-          recordClass === classId &&
-          treasureSet.has(
-            barcode
-          )
-        ) {
-
-          // Set 可以防止同一本到重複計算
-          team.foundBooks.add(
-            barcode
-          );
-
-        }
-
-      }
-    );
-
-  }
-
-
-
-  // ==========================================
-  // 計算每一隊進度
-  // ==========================================
-
-  teams.forEach(
-    function(team) {
-
-
-      team.foundCount =
-        Math.min(
-          team.foundBooks.size,
-          requiredCount
-        );
-
-
-      // Set 不需要送給網頁
-      delete team.foundBooks;
-
-    }
-  );
-
-
-
-  // ==========================================
-  // 排序
-  //
-  // 找到越多本 → 越前面
-  //
-  // 相同進度 → 小隊名稱排序
-  // ==========================================
-
-  teams.sort(
-    function(a, b) {
-
-
-      if (
-        b.foundCount !==
-        a.foundCount
-      ) {
-
-        return (
-          b.foundCount -
-          a.foundCount
-        );
-
-      }
-
-
-      return a.teamName.localeCompare(
-        b.teamName,
-        "zh-Hant"
-      );
-
-    }
-  );
-
-
-
-  // ==========================================
-  // 設定名次
-  //
-  // 例如：
-  //
-  // 10本 → 第1
-  // 8本  → 第2
-  // 8本  → 第2
-  // 6本  → 第4
-  // ==========================================
-
-  let previousCount =
-    null;
-
-
-  let previousRank =
-    0;
-
-
-  teams.forEach(
-    function(team, index) {
-
-
-      if (
-        team.foundCount !==
-        previousCount
-      ) {
-
-        previousRank =
-          index + 1;
-
-      }
-
-
-      team.rank =
-        previousRank;
-
-
-      team.totalCount =
-        requiredCount;
-
-
-      team.completed =
-        team.foundCount >=
-        requiredCount;
-
-
-      previousCount =
-        team.foundCount;
-
-    }
-  );
-
-
-
-  // ==========================================
-  // 回傳排行榜
-  // ==========================================
-
-  return {
-
-    classId:
-      classId,
-
-    className:
-      CLASS_NAMES[classId],
-
-    teams:
-      teams,
-
-    teamCount:
-      teams.length,
-
-    requiredCount:
-      requiredCount,
-
-    candidateBookCount:
-      treasureBooks.length,
-
-    updatedAt:
-      Utilities.formatDate(
-        new Date(),
-        spreadsheet
-          .getSpreadsheetTimeZone(),
-        "HH:mm:ss"
-      )
-
-  };
-
+  classId = assertValidClass_(classId);
+  const state = getStudentState_();
+  const books = new Set(state.books);
+  const foundByCard = new Map();
+  state.records.forEach(([card, barcode, recordClass]) => {
+    if (recordClass !== classId || !books.has(barcode)) return;
+    if (!foundByCard.has(card)) foundByCard.set(card, new Set());
+    foundByCard.get(card).add(barcode);
+  });
+  const teams = state.teams.filter(team => team.classId === classId).map(team =>
+    teamProgress_(team, foundByCard.get(team.libraryCard) || new Set()));
+  teams.sort((a, b) => b.foundCount - a.foundCount ||
+    a.teamName.localeCompare(b.teamName, "zh-Hant"));
+  let previousCount = null;
+  let rank = 0;
+  teams.forEach((team, index) => {
+    if (team.foundCount !== previousCount) rank = index + 1;
+    team.rank = rank;
+    previousCount = team.foundCount;
+  });
+  return {classId, className: CLASS_NAMES[classId], teams, teamCount: teams.length,
+    requiredCount: REQUIRED_BOOKS_PER_STUDENT,
+    candidateBookCount: state.books.length,
+    updatedAt: Utilities.formatDate(new Date(), state.timeZone, "HH:mm:ss")};
 }
 
-// ======================================================
-// 取得網站網址的 function
-// ======================================================
 
 function getWebAppUrl() {
 
@@ -1888,49 +907,118 @@ function getWebAppUrl() {
 // ======================================================
 
 function getBorrowRecordsSheet() {
-
-  const spreadsheet =
-    SpreadsheetApp.getActiveSpreadsheet();
-
-
-  const sheet =
-    spreadsheet.getSheetByName(
-      "BorrowRecords"
-    );
-
-
-  if (!sheet) {
-
-    throw new Error(
-      "找不到 BorrowRecords 工作表"
-    );
-
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("BorrowRecords");
+  if (!sheet) throw new Error("找不到 BorrowRecords 工作表");
+  if (sheet.getRange(1, 5).getValue() === "") {
+    sheet.getRange(1, 5).setValue("class_id");
   }
-
-
-  if (
-    sheet.getRange(1, 5).getValue() === ""
-  ) {
-
-    sheet
-      .getRange(1, 5)
-      .setValue("class_id");
-
-  }
-
-
-  sheet
-    .getRange("A:B")
-    .setNumberFormat("@");
-
-
-  sheet
-    .getRange("E:E")
-    .setNumberFormat("@");
-
-
   return sheet;
-
 }
 
+// One shared snapshot for card verification, scoring and polling.
+// Absolute expiry bounds visibility of manual spreadsheet edits even during active scanning.
+const STUDENT_CACHE_KEY = "student-state-v1";
+const STUDENT_CACHE_SECONDS = 10;
 
+function cachedStudentState_() {
+  try {
+    const raw = CacheService.getScriptCache().get(STUDENT_CACHE_KEY);
+    if (!raw) return null;
+    const state = JSON.parse(raw);
+    return Date.now() - state.loadedAt < STUDENT_CACHE_SECONDS * 1000 ? state : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function putStudentState_(state) {
+  const remaining = Math.floor((state.loadedAt + STUDENT_CACHE_SECONDS * 1000 - Date.now()) / 1000);
+  if (remaining < 1) return;
+  const json = JSON.stringify(state);
+  // UTF-8 uses at most three bytes per UTF-16 code unit; stay below CacheService's 100 KB limit.
+  if (json.length * 3 > 90000) return;
+  try {
+    CacheService.getScriptCache().put(STUDENT_CACHE_KEY, json, remaining);
+  } catch (error) {
+    // Cache eviction or a failed put must not turn a persisted scan into a reported failure.
+  }
+}
+
+function readRows_(sheet, width) {
+  const lastRow = sheet.getLastRow();
+  return lastRow < 2 ? [] : sheet.getRange(2, 1, lastRow - 1, width).getDisplayValues();
+}
+
+// Caller must hold the script lock; prevents cold readers publishing an older snapshot after a write.
+function readStudentStateLocked_() {
+  const cached = cachedStudentState_();
+  if (cached) return cached;
+  const state = {
+    loadedAt: Date.now(),
+    teams: readRows_(getTeamsSheet(), 6).filter(row => row[0] && row[1]).map(row => ({
+      libraryCard: String(row[0]).trim().toUpperCase(),
+      teamName: row[1], member1Id: row[2], member2Id: row[3],
+      classId: String(row[5]).trim(), className: CLASS_NAMES[String(row[5]).trim()] || ""
+    })),
+    books: getTreasureBooks(),
+    records: readRows_(getBorrowRecordsSheet(), 5).map(row => [
+      String(row[0]).trim().toUpperCase(), normalizeBarcode_(row[1]), String(row[4]).trim()
+    ]),
+    timeZone: SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone()
+  };
+  SpreadsheetApp.flush();
+  putStudentState_(state);
+  return state;
+}
+
+function getStudentState_() {
+  const cached = cachedStudentState_();
+  if (cached) return cached;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    return readStudentStateLocked_();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function findTeam_(state, classId, libraryCard) {
+  const card = String(libraryCard || "").trim().toUpperCase();
+  return state.teams.find(team => team.libraryCard === card && team.classId === classId) || null;
+}
+
+function foundBooks_(state, classId, libraryCard) {
+  const valid = new Set(state.books);
+  return new Set(state.records.filter(row => row[0] === libraryCard && row[2] === classId && valid.has(row[1]))
+    .map(row => row[1]));
+}
+
+function teamProgress_(team, found) {
+  const count = Math.min(found.size, REQUIRED_BOOKS_PER_STUDENT);
+  return Object.assign({}, team, {registered: true, foundCount: count,
+    totalCount: REQUIRED_BOOKS_PER_STUDENT, completed: count >= REQUIRED_BOOKS_PER_STUDENT});
+}
+
+function mutateStudent_(operation) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    CacheService.getScriptCache().remove(STUDENT_CACHE_KEY);
+    return operation();
+  } finally {
+    try { SpreadsheetApp.flush(); } finally { lock.releaseLock(); }
+  }
+}
+
+function registerTeam(classId, libraryCard, teamName, member1Id, member2Id) {
+  return mutateStudent_(() => registerTeamUncached_(classId, libraryCard, teamName, member1Id, member2Id));
+}
+
+function addTreasureBook(barcode) {
+  return mutateStudent_(() => addTreasureBookUncached_(barcode));
+}
+
+function deleteTreasureBook(barcode) {
+  return mutateStudent_(() => deleteTreasureBookUncached_(barcode));
+}
