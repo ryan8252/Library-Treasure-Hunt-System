@@ -498,6 +498,7 @@ let currentTeam = null;
 let expectedCard = "";
 
 let saving = false;
+let verifying = false;
 
 let currentClassId = "";
 
@@ -888,6 +889,8 @@ function processScan(
   rawValue
 ) {
 
+  if (saving || verifying) return;
+
 
   const value =
     normalizeScan(
@@ -1012,6 +1015,9 @@ function verifyStudentCard(
   scannedCard
 ) {
 
+  if (saving || verifying) return;
+  currentStudent = "";
+
 
   // ============================================
   // 如果是剛註冊後跳來
@@ -1061,6 +1067,7 @@ function verifyStudentCard(
 
 
 
+  verifying = true;
   studentInput.value =
     scannedCard;
 
@@ -1082,6 +1089,8 @@ function verifyStudentCard(
         // ======================================
         // 沒註冊
         // ======================================
+
+        verifying = false;
 
         if (!data.registered) {
 
@@ -1160,7 +1169,9 @@ function verifyStudentCard(
       function(error) {
 
 
+        verifying = false;
         currentStudent = "";
+        studentInput.value = "";
 
 
         result.innerHTML =
@@ -1287,7 +1298,7 @@ function saveBook(
 ) {
 
 
-  if (saving) {
+  if (saving || verifying || !currentStudent) {
 
     return;
 
@@ -1295,6 +1306,11 @@ function saveBook(
 
 
   saving = true;
+  // 一次借書證驗證只允許送出一本書。
+  currentStudent = "";
+  studentInput.value = "";
+  studentInput.disabled = true;
+  bookInput.disabled = true;
 
 
   bookInput.value =
@@ -1315,7 +1331,7 @@ function saveBook(
       function(data) {
 
 
-        saving = false;
+        finishBookScan();
 
 
         bookInput.value = "";
@@ -1366,7 +1382,7 @@ function saveBook(
             '」完成尋寶！';
 
 
-          bookInput.focus();
+          studentInput.focus();
 
 
           return;
@@ -1411,10 +1427,10 @@ function saveBook(
               data.totalCount
             ) +
 
-            '請尋找其他書籍。';
+            '請重新刷借書證，再刷其他書籍。';
 
 
-          bookInput.focus();
+          studentInput.focus();
 
 
           return;
@@ -1456,10 +1472,10 @@ function saveBook(
             data.totalCount
           ) +
 
-          '請繼續尋找下一本書。';
+          '請重新刷借書證，再刷下一本書。';
 
 
-        bookInput.focus();
+        studentInput.focus();
 
       }
 
@@ -1471,7 +1487,7 @@ function saveBook(
       function(error) {
 
 
-        saving = false;
+        finishBookScan();
 
 
         bookInput.value = "";
@@ -1493,10 +1509,10 @@ function saveBook(
 
           '<br><br>' +
 
-          '請繼續尋找指定書籍。';
+          '請重新刷借書證，再刷指定書籍。';
 
 
-        bookInput.focus();
+        studentInput.focus();
 
       }
 
@@ -1516,6 +1532,16 @@ function saveBook(
 // ==================================================
 // 進度條
 // ==================================================
+
+function finishBookScan() {
+  saving = false;
+  currentStudent = "";
+  studentInput.value = "";
+  bookInput.value = "";
+  studentInput.disabled = false;
+  bookInput.disabled = false;
+  studentInput.focus();
+}
 
 function makeProgressBar(
   found,
