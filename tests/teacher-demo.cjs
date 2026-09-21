@@ -4,6 +4,24 @@ const vm = require('node:vm');
 const path = require('node:path');
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+const metrics = {reads: 0, writes: 0, formats: 0, wholeColumnFormats: 0, flushes: 0};
+function resetMetrics() { for (const key of Object.keys(metrics)) metrics[key] = 0; }
+let now = Date.now();
+let failWrite = false;
+let failCachePut = false;
+const cacheEntries = new Map();
+const cache = {
+  get(key) {
+    const entry = cacheEntries.get(key);
+    return entry && entry.expires > now ? entry.value : null;
+  },
+  put(key, value, seconds) {
+    if (failCachePut) throw new Error('cache unavailable');
+    assert.ok(Buffer.byteLength(value, 'utf8') <= 100000);
+    cacheEntries.set(key, {value, expires: now + seconds * 1000});
+  },
+  remove(key) { cacheEntries.delete(key); }
+};
 
 class Sheet {
   constructor(rows = []) { this.rows = rows; }
@@ -11,8 +29,14 @@ class Sheet {
   getRange(row, col, height = 1, width = 1) {
     const sheet = this;
     return {
-      setNumberFormat() { return this; },
+      setNumberFormat() {
+        metrics.formats++;
+        if (typeof row === 'string') metrics.wholeColumnFormats++;
+        return this;
+      },
       setValues(values) {
+        if (failWrite) throw new Error('write failed');
+        metrics.writes++;
         assert.equal(values.length, height, 'write height');
         values.forEach((cells, i) => {
           assert.equal(cells.length, width, 'write width');
@@ -23,10 +47,11 @@ class Sheet {
       },
       setValue(value) { return this.setValues([[value]]); },
       getDisplayValues() {
+        metrics.reads++;
         return Array.from({length: height}, (_, i) =>
           Array.from({length: width}, (_, j) => String(sheet.rows[row - 1 + i]?.[col - 1 + j] ?? '')));
       },
-      getValue() { return sheet.rows[row - 1]?.[col - 1] ?? ''; }
+      getValue() { metrics.reads++; return sheet.rows[row - 1]?.[col - 1] ?? ''; }
     };
   }
   deleteRow(row) { this.rows.splice(row - 1, 1); }
@@ -43,7 +68,9 @@ const spreadsheet = {
 };
 let locked = false;
 const backend = vm.createContext({
-  SpreadsheetApp: {getActiveSpreadsheet: () => spreadsheet},
+  SpreadsheetApp: {getActiveSpreadsheet: () => spreadsheet, flush() { metrics.flushes++; }},
+  CacheService: {getScriptCache: () => cache},
+  Date: class extends Date { static now() { return now; } },
   LockService: {getScriptLock: () => ({
     waitLock() { assert.equal(locked, false); locked = true; },
     releaseLock() { locked = false; }
@@ -187,7 +214,7 @@ directScan.context.processScan('A100000004');
 assert.equal(directScan.calls[0].method, 'getStudentProgress');
 const board = page('Leaderboard.html');
 assert.equal(board.calls[0].args.length, 0);
-assert.equal(board.timers[0].ms, 5000);
+assert.equal(board.timers[0].ms, 2000);
 assert.ok(board.elements.get('board').innerHTML.includes('&lt;script&gt;'));
 assert.ok(board.elements.get('board').innerHTML.includes('黃老師'));
 board.timers[0].fn();
@@ -227,3 +254,89 @@ backend.registerTeam('A100000005', '單人小隊', '王老師');
 assert.equal(backend.getTeamByCard('A100000005').member2Id, '');
 assert.equal(backend.getStudentProgress('A100000005').foundCount, 1);
 console.log('PASS: solo registration, optional second member, escaped solo display, two-person display, updates and required first member');
+
+// Warm card lookups and two-second polling must reuse the shared snapshot.
+backend.getStudentProgress('A100000005');
+resetMetrics();
+backend.getStudentProgress('A100000005');
+backend.getTeamByCard('A100000005');
+backend.getLeaderboardData();
+assert.equal(metrics.reads, 0);
+assert.equal(metrics.writes, 0);
+assert.equal(metrics.formats, 0);
+const warmMetrics = {...metrics};
+resetMetrics();
+backend.saveBorrowRecord('A100000005', '002');
+assert.equal(metrics.reads, 0, 'warm scan does not reload full tables');
+assert.equal(metrics.writes, 1, 'one row write per successful scan');
+assert.equal(metrics.formats, 1, 'format only the new card/barcode cells');
+assert.equal(metrics.wholeColumnFormats, 0);
+assert.equal(metrics.flushes, 1);
+const scanMetrics = {...metrics};
+assert.equal(backend.getStudentProgress('A100000005').foundCount, 2);
+assert.equal(backend.getLeaderboardData().teams.find(team => team.libraryCard === 'A100000005').foundCount, 2);
+resetMetrics();
+assert.equal(backend.saveBorrowRecord('A100000005', '002').isDuplicate, true);
+assert.equal(metrics.writes, 0);
+assert.equal(metrics.reads, 0);
+
+// Rebuild after eviction/expiry; stale counts must never double-count the same book.
+cacheEntries.clear();
+resetMetrics();
+assert.equal(backend.getStudentProgress('A100000005').foundCount, 2);
+assert.ok(metrics.reads > 0);
+assert.equal(metrics.formats, 0, 'existing sheets require no repeated whole-column formatting');
+assert.equal(backend.saveBorrowRecord('A100000005', '002').isDuplicate, true);
+now += 11000;
+resetMetrics();
+backend.getLeaderboardData();
+assert.ok(metrics.reads > 0);
+
+// Every mutation invalidates the snapshot; book removal changes progress immediately.
+backend.deleteTreasureBook('002');
+assert.equal(backend.getStudentProgress('A100000005').foundCount, 1);
+backend.addTreasureBook('002');
+assert.equal(backend.getStudentProgress('A100000005').foundCount, 2);
+backend.registerTeam('A100000005', '即時更新隊名', '王老師');
+assert.equal(backend.getLeaderboardData().teams.find(team => team.libraryCard === 'A100000005').teamName, '即時更新隊名');
+
+// Cache publication failures fall back to the committed sheet; failed writes clear old cache.
+failCachePut = true;
+assert.equal(backend.saveBorrowRecord('A100000005', '003').foundCount, 3);
+assert.equal(backend.getStudentProgress('A100000005').foundCount, 3);
+failCachePut = false;
+backend.getStudentProgress('A100000005');
+failWrite = true;
+assert.throws(() => backend.saveBorrowRecord('A100000005', '004'), /write failed/);
+failWrite = false;
+assert.equal(locked, false);
+assert.equal(backend.getStudentProgress('A100000005').foundCount, 3);
+assert.equal(backend.saveBorrowRecord('A100000005', '004').foundCount, 4);
+
+// Out-of-band edits are visible within the fixed ten-second window, not postponed by scans.
+const soloRow = sheets.get('DemoTeams').rows.find(row => row[0] === 'A100000005');
+soloRow[1] = '試算表手動改名';
+now += 8000;
+backend.saveBorrowRecord('A100000005', '005');
+now += 3000;
+assert.equal(backend.getTeamByCard('A100000005').teamName, '試算表手動改名');
+const poll = page('Leaderboard.html', {}, true);
+poll.timers[0].fn();
+assert.equal(poll.pending.length, 1, 'slow polls must not overlap');
+poll.pending.shift()();
+poll.timers[0].fn();
+assert.equal(poll.pending.length, 1);
+console.log('PASS: cache reuse, eviction, expiry, mutations, persistence failures, manual edits and non-overlapping 2-second polling');
+
+// Corrupt/missing and oversized cache entries are optional, never the source of truth.
+cacheEntries.set('teacher-demo-state-v1', {value: 'broken JSON', expires: now + 10000});
+assert.equal(backend.getStudentProgress('A100000005').foundCount, 5);
+backend.registerTeam('A100000006', '大'.repeat(31000), '測試老師');
+assert.equal(backend.getTeamByCard('A100000006').teamName.length, 31000);
+assert.equal(cache.get('teacher-demo-state-v1'), null);
+assert.equal(backend.saveBorrowRecord('A100000006', '001').foundCount, 1);
+assert.equal(backend.saveBorrowRecord('A100000006', '001').isDuplicate, true);
+assert.equal(locked, false);
+console.log('PASS: corrupt and oversized cache fallback without duplicate records');
+console.log('Warm lookup + card + leaderboard:', JSON.stringify(warmMetrics));
+console.log('Warm successful book scan:', JSON.stringify(scanMetrics));

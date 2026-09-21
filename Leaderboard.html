@@ -378,7 +378,7 @@ body {
       class="update-info"
     >
 
-      排行榜每 5 秒自動更新
+      排行榜每 2 秒自動更新
 
     </div>
 
@@ -521,7 +521,7 @@ function renderLeaderboard(
 
     data.updatedAt +
 
-    "　｜　每 5 秒自動更新";
+    "　｜　每 2 秒自動更新";
 
 
 
@@ -750,13 +750,13 @@ function escapeHtml(
 
 window.onload = function() {
   loadLeaderboard();
-  setInterval(loadLeaderboard, 5000);
+  setInterval(loadLeaderboard, 2000);
 };
 
 
 
 // ==========================================
-// 每 5 秒更新老師小隊的排行榜
+// 每 2 秒更新老師小隊的排行榜
 // ==========================================
 
 
