@@ -169,7 +169,7 @@ now += 8000;
 backend.saveBorrowRecord('604', card, '005');
 now += 3000;
 assert.equal(backend.getTeamByCard('604', card).teamName, '手動改名');
-cacheEntries.set('student-state-v1', {value: 'broken JSON', expires: now + 10000});
+cacheEntries.set('student-state-v2:604', {value: 'broken JSON', expires: now + 10000});
 assert.equal(backend.getStudentProgress('604', card).foundCount, 5);
 assert.equal(JSON.stringify([...sheets].filter(([name]) => name.startsWith('Demo'))), teacherSnapshot);
 console.log('PASS: eviction, fixed expiry, mutation invalidation, failure recovery and teacher data isolation');
@@ -215,9 +215,27 @@ for (let n = 0; n < 2000; n++) {
 }
 cacheEntries.clear();
 assert.equal(backend.getStudentProgress('603', card).foundCount, 10);
-assert.equal(cache.get('student-state-v1'), null);
+assert.equal(cache.get('student-state-v2:603'), null);
 assert.equal(backend.getStudentProgress('604', card).foundCount, 5);
+assert.ok(cache.get('student-state-v2:604'), 'other class history must not overflow this cache');
+resetMetrics();
+backend.getStudentProgress('604', card);
+assert.equal(metrics.reads, 0, 'warm class cache avoids reading other classes');
 assert.equal(backend.saveBorrowRecord('604', card, '001').isDuplicate, true);
 assert.equal(backend.saveBorrowRecord('604', card, '006').foundCount, 6);
 assert.equal(locked, false);
 console.log('PASS: oversized history fallback retains separate class progress and duplicate protection');
+
+// Registration and scans preserve other classes' warm snapshots.
+const cached604 = cache.get('student-state-v2:604');
+backend.registerTeam('603', card, '???', '60301', '60302');
+assert.equal(cache.get('student-state-v2:604'), cached604);
+backend.saveBorrowRecord('603', card, '001');
+assert.equal(cache.get('student-state-v2:604'), cached604);
+const state604 = JSON.parse(cached604);
+assert.ok(state604.teams.every(team => team.classId === '604'));
+assert.ok(state604.records.every(row => row[2] === '604'));
+backend.deleteTreasureBook('006');
+assert.equal(cache.get('student-state-v2:604'), null);
+assert.equal(backend.getStudentProgress('604', card).foundCount, 5);
+console.log('PASS: per-class cache contents, targeted invalidation and shared book-list invalidation');

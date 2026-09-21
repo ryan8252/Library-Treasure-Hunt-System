@@ -200,7 +200,7 @@ function getTeamsSheet() {
 
 function getTeamByCard(classId, libraryCard) {
   classId = assertValidClass_(classId);
-  return findTeam_(getStudentState_(), classId, libraryCard);
+  return findTeam_(getStudentState_(classId), classId, libraryCard);
 }
 
 function registerTeamUncached_(
@@ -821,7 +821,7 @@ function saveBorrowRecord(classId, studentId, bookBarcode) {
   lock.waitLock(10000);
   try {
     // Lock covers snapshot loading, duplicate checks, persistence and cache update.
-    const state = readStudentStateLocked_();
+    const state = readStudentStateLocked_(classId);
     const team = findTeam_(state, classId, studentId);
     if (!team) throw new Error("這張借書證尚未完成小隊註冊");
     if (!state.books.includes(bookBarcode)) {
@@ -832,7 +832,7 @@ function saveBorrowRecord(classId, studentId, bookBarcode) {
     const alreadyCompleted = found.size >= REQUIRED_BOOKS_PER_STUDENT;
     if (!isDuplicate && !alreadyCompleted) {
       // Remove the old snapshot before writing so a failed write cannot leave stale data.
-      CacheService.getScriptCache().remove(STUDENT_CACHE_KEY);
+      CacheService.getScriptCache().remove(studentCacheKey_(classId));
       // Snapshot loading already checked the schema; avoid rereading the header for each scan.
       const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("BorrowRecords");
       if (!sheet) throw new Error("找不到 BorrowRecords 工作表");
@@ -858,7 +858,7 @@ function saveBorrowRecord(classId, studentId, bookBarcode) {
 
 function getStudentProgress(classId, studentId) {
   classId = assertValidClass_(classId);
-  const state = getStudentState_();
+  const state = getStudentState_(classId);
   const team = findTeam_(state, classId, studentId);
   if (!team) return {registered: false, classId, className: CLASS_NAMES[classId],
     foundCount: 0, totalCount: REQUIRED_BOOKS_PER_STUDENT, completed: false};
@@ -867,7 +867,7 @@ function getStudentProgress(classId, studentId) {
 
 function getLeaderboardData(classId) {
   classId = assertValidClass_(classId);
-  const state = getStudentState_();
+  const state = getStudentState_(classId);
   const books = new Set(state.books);
   const foundByCard = new Map();
   state.records.forEach(([card, barcode, recordClass]) => {
@@ -915,17 +915,21 @@ function getBorrowRecordsSheet() {
   return sheet;
 }
 
-// One shared snapshot for card verification, scoring and polling.
+// Each class shares its own snapshot for card verification, scoring and polling.
 // Absolute expiry bounds visibility of manual spreadsheet edits even during active scanning.
-const STUDENT_CACHE_KEY = "student-state-v1";
+const STUDENT_CACHE_PREFIX = "student-state-v2:";
+
+function studentCacheKey_(classId) {
+  return STUDENT_CACHE_PREFIX + assertValidClass_(classId);
+}
 const STUDENT_CACHE_SECONDS = 10;
 
-function cachedStudentState_() {
+function cachedStudentState_(classId) {
   try {
-    const raw = CacheService.getScriptCache().get(STUDENT_CACHE_KEY);
+    const raw = CacheService.getScriptCache().get(studentCacheKey_(classId));
     if (!raw) return null;
     const state = JSON.parse(raw);
-    return Date.now() - state.loadedAt < STUDENT_CACHE_SECONDS * 1000 ? state : null;
+    return state.classId === classId && Date.now() - state.loadedAt < STUDENT_CACHE_SECONDS * 1000 ? state : null;
   } catch (error) {
     return null;
   }
@@ -938,7 +942,7 @@ function putStudentState_(state) {
   // UTF-8 uses at most three bytes per UTF-16 code unit; stay below CacheService's 100 KB limit.
   if (json.length * 3 > 90000) return;
   try {
-    CacheService.getScriptCache().put(STUDENT_CACHE_KEY, json, remaining);
+    CacheService.getScriptCache().put(studentCacheKey_(state.classId), json, remaining);
   } catch (error) {
     // Cache eviction or a failed put must not turn a persisted scan into a reported failure.
   }
@@ -950,18 +954,19 @@ function readRows_(sheet, width) {
 }
 
 // Caller must hold the script lock; prevents cold readers publishing an older snapshot after a write.
-function readStudentStateLocked_() {
-  const cached = cachedStudentState_();
+function readStudentStateLocked_(classId) {
+  const cached = cachedStudentState_(classId);
   if (cached) return cached;
   const state = {
+    classId,
     loadedAt: Date.now(),
-    teams: readRows_(getTeamsSheet(), 6).filter(row => row[0] && row[1]).map(row => ({
+    teams: readRows_(getTeamsSheet(), 6).filter(row => row[0] && row[1] && String(row[5]).trim() === classId).map(row => ({
       libraryCard: String(row[0]).trim().toUpperCase(),
       teamName: row[1], member1Id: row[2], member2Id: row[3],
       classId: String(row[5]).trim(), className: CLASS_NAMES[String(row[5]).trim()] || ""
     })),
     books: getTreasureBooks(),
-    records: readRows_(getBorrowRecordsSheet(), 5).map(row => [
+    records: readRows_(getBorrowRecordsSheet(), 5).filter(row => String(row[4]).trim() === classId).map(row => [
       String(row[0]).trim().toUpperCase(), normalizeBarcode_(row[1]), String(row[4]).trim()
     ]),
     timeZone: SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone()
@@ -971,13 +976,13 @@ function readStudentStateLocked_() {
   return state;
 }
 
-function getStudentState_() {
-  const cached = cachedStudentState_();
+function getStudentState_(classId) {
+  const cached = cachedStudentState_(classId);
   if (cached) return cached;
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    return readStudentStateLocked_();
+    return readStudentStateLocked_(classId);
   } finally {
     lock.releaseLock();
   }
@@ -1000,11 +1005,13 @@ function teamProgress_(team, found) {
     totalCount: REQUIRED_BOOKS_PER_STUDENT, completed: count >= REQUIRED_BOOKS_PER_STUDENT});
 }
 
-function mutateStudent_(operation) {
+function mutateStudent_(operation, classId) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    CacheService.getScriptCache().remove(STUDENT_CACHE_KEY);
+    // Shared book-list edits affect every class; registration affects only its class.
+    const classes = classId ? [assertValidClass_(classId)] : VALID_CLASSES;
+    classes.forEach(id => CacheService.getScriptCache().remove(studentCacheKey_(id)));
     return operation();
   } finally {
     try { SpreadsheetApp.flush(); } finally { lock.releaseLock(); }
@@ -1012,7 +1019,8 @@ function mutateStudent_(operation) {
 }
 
 function registerTeam(classId, libraryCard, teamName, member1Id, member2Id) {
-  return mutateStudent_(() => registerTeamUncached_(classId, libraryCard, teamName, member1Id, member2Id));
+  classId = assertValidClass_(classId);
+  return mutateStudent_(() => registerTeamUncached_(classId, libraryCard, teamName, member1Id, member2Id), classId);
 }
 
 function addTreasureBook(barcode) {
