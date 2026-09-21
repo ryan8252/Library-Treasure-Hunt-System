@@ -649,13 +649,7 @@ function renderLeaderboard(
           '<div class="members">' +
 
             escapeHtml(
-              team.member1Id
-            ) +
-
-            '、' +
-
-            escapeHtml(
-              team.member2Id
+              [team.member1Id, team.member2Id].filter(Boolean).join('、')
             ) +
 
           '</div>' +

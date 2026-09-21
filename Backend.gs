@@ -274,8 +274,8 @@ function registerTeam(
   }
 
 
-  if (!member1Id || !member2Id) {
-    throw new Error("請輸入兩位隊員的姓名或編號");
+  if (!member1Id) {
+    throw new Error("請輸入隊員一的姓名或編號");
   }
 
   const sheet =

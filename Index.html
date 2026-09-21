@@ -672,11 +672,7 @@ function showTeam(
 
     "隊員：" +
 
-    team.member1Id +
-
-    "、" +
-
-    team.member2Id;
+    [team.member1Id, team.member2Id].filter(Boolean).join("、");
 
 }
 

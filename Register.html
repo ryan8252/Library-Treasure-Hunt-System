@@ -225,6 +225,7 @@ button:disabled {
 
 
   <h2>小隊註冊</h2>
+  <p>每隊可由 1～2 人組成；單人參加時，隊員二留空即可。</p>
 
 
 
@@ -321,7 +322,7 @@ button:disabled {
         ④
       </span>
 
-      隊員二姓名或編號
+      隊員二姓名或編號（選填）
 
     </label>
 
@@ -329,7 +330,7 @@ button:disabled {
     <input
       id="member2"
       type="text"
-      placeholder="例如：陳老師"
+      placeholder="單人參加可留空"
       autocomplete="off"
     >
 
@@ -595,17 +596,6 @@ function submitRegistration() {
   }
 
 
-  if (!id2) {
-
-    showError(
-      "請輸入隊員二姓名或編號"
-    );
-
-    member2.focus();
-
-    return;
-
-  }
 
 
 
@@ -656,13 +646,7 @@ function submitRegistration() {
         '隊員：<b>' +
 
         escapeHtml(
-          data.member1Id
-        ) +
-
-        '、' +
-
-        escapeHtml(
-          data.member2Id
+          [data.member1Id, data.member2Id].filter(Boolean).join('、')
         ) +
 
         '</b><br><br>' +
