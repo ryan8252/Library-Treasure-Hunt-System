@@ -989,7 +989,8 @@ function saveBorrowRecord(classId,studentId,bookBarcode) {
 
 
   // 尋找有沒有這個小隊
-  const team = getTeamByCard(studentId);
+  classId = assertValidClass_(classId);
+  const team = getTeamByCard(classId, studentId);
 
   if (!team) {
 
